@@ -24,7 +24,7 @@ let redisClient
 // Express server
 const app = express()
 app.use(express.json())
-app.use(bodyParser.json());
+
 
 // Redis ulanishi
 async function initRedis() {
