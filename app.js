@@ -1,6 +1,5 @@
 require("dotenv").config()
 const express = require("express")
-const { RedisDB } = require('./lib/redis');
 const TelegramBot = require("node-telegram-bot-api")
 const redis = require("redis")
 const fs = require("fs-extra")
