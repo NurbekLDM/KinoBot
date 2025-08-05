@@ -1,6 +1,7 @@
 require("dotenv").config()
 const express = require("express")
-const TelegramBot = require("node-telegram-bot-api")
+import { Telegraf } from 'telegraf';
+
 const redis = require("redis")
 const fs = require("fs-extra")
 const path = require("path")
@@ -11,7 +12,7 @@ const { v4: uuidv4 } = require("uuid")
 
 // Telegram Bot konfiguratsiyasi
 const API_KEY = process.env.BOT_TOKEN
-const bot = new TelegramBot(API_KEY, { polling: true })
+const bot = new Telegraf(process.env.BOT_TOKEN);
 
 // Bot ma'lumotlari
 const idbot = 7359677611
