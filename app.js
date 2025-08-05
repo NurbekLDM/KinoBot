@@ -38,7 +38,7 @@ async function initRedis() {
     redisClient = redis.createClient({
       socket: {
         host: process.env.REDIS_HOST,
-        port: 3000,
+        port: 6379,
         reconnectDelay: 5000,
         connectTimeout: 10000,
       },
