@@ -24,6 +24,7 @@ let redisClient
 // Express server
 const app = express()
 app.use(express.json())
+app.use(bodyParser.json());
 
 // Redis ulanishi
 async function initRedis() {
@@ -2474,4 +2475,4 @@ process.on("SIGINT", async () => {
 
 startServer().catch(console.error)
 
-module.exports = { bot, redisClient, RedisDB }
+module.exports = { app,bot, redisClient, RedisDB }
