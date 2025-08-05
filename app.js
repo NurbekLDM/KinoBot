@@ -30,13 +30,13 @@ async function initRedis() {
   try {
     console.log("Redis ulanish konfiguratsiyasi:")
     console.log("Host:", process.env.REDIS_HOST)
-    console.log("Port:", process.env.REDIS_PORT)
+    
     console.log("Password mavjud:", !!process.env.REDIS_PASSWORD)
 
     redisClient = redis.createClient({
       socket: {
         host: process.env.REDIS_HOST,
-        port: Number.parseInt(process.env.REDIS_PORT),
+        port: 3000,
         reconnectDelay: 5000,
         connectTimeout: 10000,
       },
@@ -2448,7 +2448,7 @@ async function startServer() {
     res.sendStatus(200)
   })
 
-  const PORT = process.env.PORT || 3000
+  const PORT = 3000
   app.listen(PORT, () => {
     console.log(`Server ${PORT} portda ishlamoqda`)
   })
