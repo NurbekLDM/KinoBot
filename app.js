@@ -8,6 +8,7 @@ const moment = require("moment")
 const rimraf = require("rimraf")
 const { v4: uuidv4 } = require("uuid")
 
+
 // Telegram Bot konfiguratsiyasi
 const API_KEY = process.env.BOT_TOKEN
 const bot = new TelegramBot(API_KEY, { polling: true })
@@ -440,12 +441,16 @@ class RedisDB {
   }
 }
 
-// Papkalarni yaratish (faqat temp papka uchun)
 async function createDirectories() {
-  const dirs = ["temp"]
-  for (const dir of dirs) {
-    await fs.ensureDir(dir)
-  }
+  const tempPath =
+    process.env.NODE_ENV === 'production'
+      ? path.join('/tmp', 'temp') // Vercel yoki productionda
+      : path.join(__dirname, 'temp') // Localhostda
+
+  await fs.ensureDir(tempPath)
+  console.log(`Temp directory ready at: ${tempPath}`)
+
+  return tempPath // kerak bo‘lsa pathni qaytaramiz
 }
 
 // Papkani o'chirish funksiyasi
@@ -1262,10 +1267,11 @@ bot.on("callback_query", async (query) => {
     // Kanalga kino yuborish callback
     if (data.startsWith("channel_")) {
       try {
-        const tempId = data.split("_")[1]
-        const fileId = await fs.readFile(`temp/file_${tempId}.id`, "utf8")
-        const fileName = Buffer.from(await fs.readFile(`temp/file_${tempId}.name`, "utf8"), "base64").toString()
-        const caption = Buffer.from(await fs.readFile(`temp/film_${tempId}.caption`, "utf8"), "base64").toString()
+         const filmData = await redisClient.hgetall(`film:${tempId}`)
+         const fileId = filmData.file_id
+         const fileName = Buffer.from(filmData.file_name, "base64").toString()
+         const caption = Buffer.from(filmData.caption, "base64").toString()
+         
 
         const movieData = {
           file_name: fileName,
@@ -1830,45 +1836,57 @@ async function handleStepBasedCommands(msg, user) {
   const text = msg.text
   const step = user ? user.step : "0"
 
-  // Video yuklash
-  if (step === "movie" && msg.video) {
-    const tempId = uuidv4()
-    await fs.writeFile(`temp/file_${tempId}.id`, msg.video.file_id)
-    await fs.writeFile(`temp/file_${tempId}.name`, Buffer.from(msg.video.file_name || "video").toString("base64"))
+// Video yuklash
+if (step === "movie" && msg.video) {
+  const tempId = uuidv4()
 
-    await bot.sendMessage(chatId, "<b>🎬 Kino ma'lumotini yuboring:</b>", {
-      parse_mode: "HTML",
-      reply_markup: cancel,
-    })
-    await RedisDB.updateUser(userId, { step: "caption", temp_id: tempId })
-  }
+  await redisClient.hset(`film:${tempId}`, {
+    file_id: msg.video.file_id,
+    file_name: Buffer.from(msg.video.file_name || "video").toString("base64"),
+  })
 
-  // Caption qo'shish
-  if (step === "caption" && text && text !== "🎬 Kino qo'shish") {
-    const tempId = user.temp_id
-    await fs.writeFile(`temp/film_${tempId}.caption`, Buffer.from(text).toString("base64"))
+  await bot.sendMessage(chatId, "<b>🎬 Kino ma'lumotini yuboring:</b>", {
+    parse_mode: "HTML",
+    reply_markup: cancel,
+  })
 
-    const fileId = await fs.readFile(`temp/file_${tempId}.id`, "utf8")
-    const reklama = await RedisDB.getAdsText()
+  await RedisDB.updateUser(userId, { step: "caption", temp_id: tempId })
+}
 
-    const keyboard = {
-      inline_keyboard: [
-        [
-          {
-            text: "🎞️ Kanalga yuborish",
-            callback_data: `channel_${tempId}`,
-          },
-        ],
+// Caption qo‘shish
+if (step === "caption" && text && text !== "🎬 Kino qo'shish") {
+  const tempId = user.temp_id
+
+  // Caption ni redisga yozamiz
+  await redisClient.hset(`film:${tempId}`, {
+    caption: Buffer.from(text).toString("base64"),
+  })
+
+  // Redisdan malumotlarni o‘qib olamiz
+  const filmData = await redisClient.hgetall(`film:${tempId}`)
+  const fileId = filmData.file_id
+  const reklama = await RedisDB.getAdsText()
+
+  const keyboard = {
+    inline_keyboard: [
+      [
+        {
+          text: "🎞️ Kanalga yuborish",
+          callback_data: `channel_${tempId}`,
+        },
       ],
-    }
-
-    await bot.sendVideo(chatId, fileId, {
-      caption: `<b>${text}</b>\n\n<b>${reklama}</b>`,
-      parse_mode: "HTML",
-      reply_markup: keyboard,
-    })
-    await RedisDB.updateUser(userId, { step: "0" })
+    ],
   }
+
+  await bot.sendVideo(chatId, fileId, {
+    caption: `<b>${text}</b>\n\n<b>${reklama}</b>`,
+    parse_mode: "HTML",
+    reply_markup: keyboard,
+  })
+
+  await RedisDB.updateUser(userId, { step: "0" })
+}
+
 
   // Kino o'chirish
   if (step === "movie-remove" && text && text !== "🗑️ Kino o'chirish") {
