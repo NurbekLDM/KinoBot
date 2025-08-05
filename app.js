@@ -2493,4 +2493,10 @@ process.on("SIGINT", async () => {
 
 startServer().catch(console.error)
 
+bot.launch().then(() => {
+  console.log("✅ Bot ishga tushdi!");
+}).catch((err) => {
+  console.error("❌ Botni ishga tushirishda xatolik:", err);
+});
+
 module.exports =  app
