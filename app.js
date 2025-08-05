@@ -1,5 +1,7 @@
 require("dotenv").config()
 const express = require("express")
+const bot = require('./lib/bot');
+const { redisClient, RedisDB } = require('./lib/redis');
 const TelegramBot = require("node-telegram-bot-api")
 const redis = require("redis")
 const fs = require("fs-extra")
@@ -2475,4 +2477,4 @@ process.on("SIGINT", async () => {
 
 startServer().catch(console.error)
 
-module.exports = { app,bot, redisClient, RedisDB }
+module.exports =  app
