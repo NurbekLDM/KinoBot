@@ -2493,10 +2493,14 @@ process.on("SIGINT", async () => {
 
 startServer().catch(console.error)
 
-bot.launch().then(() => {
-  console.log("✅ Bot ishga tushdi!");
-}).catch((err) => {
-  console.error("❌ Botni ishga tushirishda xatolik:", err);
+app.use(bot.webhookCallback('/webhook'));
+
+bot.telegram.setWebhook('https://bugunfilm-nurbeks-projects-f4894644.vercel.app/webhook');
+
+bot.start((ctx) => ctx.reply("Bot ishga tushdi ✅"));
+
+app.listen(3000, () => {
+  console.log('🚀 Server 3000 portda ishlamoqda');
 });
 
 module.exports =  app
