@@ -530,22 +530,33 @@ async function getName(id) {
 // Majburiy obuna tekshirish - xatoliklarni boshqarish bilan
 async function joinchat(userId) {
   try {
+    console.log(`Checking channel membership for user ${userId}`);
+    
     const mandatoryChannels = await RedisDB.getMandatoryChannels();
     const joinRequestChannels = await RedisDB.getJoinRequestChannels();
+    
+    console.log(`Mandatory channels:`, mandatoryChannels);
+    console.log(`Join request channels:`, joinRequestChannels);
+    
     const allChannels = [...mandatoryChannels, ...joinRequestChannels];
 
-    if (allChannels.length === 0) return true;
+    if (allChannels.length === 0) {
+      console.log(`No channels to check for user ${userId}`);
+      return true;
+    }
 
     let uns = false;
     const inlineKeyboard = [];
 
     for (const channelId of mandatoryChannels) {
       try {
+        console.log(`Checking mandatory channel ${channelId} for user ${userId}`);
+        
         const url = await RedisDB.getChannelUrl(channelId);
         
         // Retry mexanizmi
         let chat, chatMember;
-        let retries = 3;
+        let retries = 2; // Reduced retries for faster response
         
         while (retries > 0) {
           try {
@@ -553,15 +564,25 @@ async function joinchat(userId) {
             chatMember = await bot.getChatMember(channelId, userId);
             break;
           } catch (error) {
-            console.log(`Kanal tekshirishda xatolik (qolgan urinish: ${retries-1}):`, error.message);
+            console.log(`Channel check error for ${channelId} (retries left: ${retries-1}):`, error.message);
             retries--;
-            if (retries === 0) throw error;
-            // 1 sekund kutish
-            await new Promise(resolve => setTimeout(resolve, 1000));
+            if (retries === 0) {
+              // Channel mavjud emas yoki API xatolik - skip this channel
+              console.log(`Skipping channel ${channelId} due to persistent errors`);
+              continue;
+            }
+            // 500ms kutish
+            await new Promise(resolve => setTimeout(resolve, 500));
           }
         }
         
+        if (!chat || !chatMember) {
+          console.log(`Could not get data for channel ${channelId}, skipping`);
+          continue;
+        }
+        
         let status = chatMember.status;
+        console.log(`User ${userId} status in channel ${channelId}: ${status}`);
 
         if (status === "left") {
           const isRequested = await RedisDB.isUserRequested(channelId, userId);
@@ -578,6 +599,21 @@ async function joinchat(userId) {
             },
           ]);
         } else {
+          inlineKeyboard.push([
+            {
+              text: `❌ ${chat.title}`,
+              url: url || `https://t.me/${chat.username || "durov"}`,
+            },
+          ]);
+          uns = true;
+          console.log(`User ${userId} is not a member of channel ${channelId}`);
+        }
+      } catch (error) {
+        console.error(`Error checking mandatory channel ${channelId}:`, error);
+        // Skip this channel instead of failing completely
+        continue;
+      }
+    }
           inlineKeyboard.push([
             {
               text: `❌ ${chat.title}`,
@@ -680,7 +716,8 @@ async function joinchat(userId) {
 
     return true;
   } catch (error) {
-    console.error("Joinchat funksiyasida umumiy xatolik:", error);
+    console.error(`Joinchat funksiyasida umumiy xatolik for user ${userId}:`, error);
+    console.log(`Returning true to allow bot to continue for user ${userId}`);
     return true; // Xatolik bo'lsa ham botni ishlashga ruxsat berish
   }
 }
@@ -717,21 +754,43 @@ async function setupBotHandlers() {
 
       console.log(`Start command received from user ${userId}`);
 
-      if (msg.chat.type !== "private") return;
-
-      let user = await RedisDB.getUser(userId);
-      if (user && user.ban === "1") return;
-
-      if (!user) {
-        user = await RedisDB.createUser(userId);
-      } else {
-        await RedisDB.updateUser(userId, { lastmsg: "start", step: "0" });
-      }
-
-      if (!(await joinchat(userId))) return;
-
       try {
+        if (msg.chat.type !== "private") {
+          console.log(`Non-private chat type: ${msg.chat.type}`);
+          return;
+        }
+
+        let user = await RedisDB.getUser(userId);
+        console.log(`User data:`, user);
+        
+        if (user && user.ban === "1") {
+          console.log(`User ${userId} is banned`);
+          return;
+        }
+
+        if (!user) {
+          console.log(`Creating new user ${userId}`);
+          user = await RedisDB.createUser(userId);
+          console.log(`User created:`, user);
+        } else {
+          console.log(`Updating existing user ${userId}`);
+          await RedisDB.updateUser(userId, { lastmsg: "start", step: "0" });
+        }
+
+        console.log(`Checking channel membership for user ${userId}`);
+        const joinResult = await joinchat(userId);
+        console.log(`Join check result:`, joinResult);
+        
+        if (!joinResult) {
+          console.log(`User ${userId} failed channel check`);
+          return;
+        }
+
+        console.log(`Preparing start message for user ${userId}`);
+        
         const kino_id = await RedisDB.getMovieChannel();
+        console.log(`Movie channel ID:`, kino_id);
+        
         let kino = "";
         let kinoUrl = "";
 
@@ -745,6 +804,7 @@ async function setupBotHandlers() {
               kino = chat.title || "Kino Kanali";
               kinoUrl = `https://t.me/c/${Math.abs(kino_id).toString().slice(4)}`;
             }
+            console.log(`Movie channel info: ${kino}, URL: ${kinoUrl}`);
           } catch (error) {
             console.error("Kino kanal ma'lumotlarini olishda xatolik:", error);
             kino = "";
@@ -753,13 +813,20 @@ async function setupBotHandlers() {
         }
 
         const startTextBase64 = await RedisDB.getText("start");
+        console.log(`Start text base64:`, startTextBase64);
+        
         const startText = startTextBase64
           ? Buffer.from(startTextBase64, "base64").toString()
           : "👋 Assalomu alaykum {name}  botimizga xush kelibsiz.\n\n✅🎭 Kino kodini yuboring.";
+        
+        console.log(`Start text decoded:`, startText);
+        
         const currentTime = moment().format("DD.MM.YYYY | HH:mm");
         const message = startText
           .replace("{name}", `<a href="tg://user?id=${userId}">${name}</a>`)
           .replace("{time}", currentTime);
+
+        console.log(`Final message:`, message);
 
         const keyboard = {
           inline_keyboard: [
@@ -778,20 +845,25 @@ async function setupBotHandlers() {
           ],
         };
 
+        console.log(`Sending start message to user ${userId}`);
+        
         await bot.sendMessage(chatId, message, {
           parse_mode: "HTML",
           reply_markup: keyboard,
         });
 
-        console.log(`Start message sent to user ${userId}`);
+        console.log(`Start message sent successfully to user ${userId}`);
+        
       } catch (error) {
-        console.error("/start komandasi xatolik:", error);
+        console.error(`/start command error for user ${userId}:`, error);
         
         // Fallback message
         try {
+          console.log(`Sending fallback message to user ${userId}`);
           await bot.sendMessage(chatId, "👋 Assalomu alaykum! Botga xush kelibsiz.\n\n🎬 Kino kodini yuboring:");
+          console.log(`Fallback message sent to user ${userId}`);
         } catch (fallbackError) {
-          console.error("Fallback message ham yuborilmadi:", fallbackError);
+          console.error(`Fallback message ham yuborilmadi user ${userId}:`, fallbackError);
         }
       }
     });
