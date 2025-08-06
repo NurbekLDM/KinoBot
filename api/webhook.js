@@ -8,12 +8,13 @@ dotenv.config();
 
 // Telegram Bot konfiguratsiyasi
 const API_KEY = process.env.BOT_TOKEN;
-const WEBHOOK_URL = process.env.WEBHOOK_URL || "https://your-vercel-app.vercel.app";
+const WEBHOOK_URL =
+  process.env.WEBHOOK_URL || "https://your-vercel-app.vercel.app";
 
 // Bot ni webhook rejimida ishga tushirish (polling: false!)
-const bot = new TelegramBot(API_KEY, { 
+const bot = new TelegramBot(API_KEY, {
   polling: false,
-  webHook: false
+  webHook: false,
 });
 
 // Bot ma'lumotlari
@@ -34,7 +35,7 @@ async function initRedis() {
 
   try {
     console.log("Redis ulanish...");
-    
+
     // Redis konfiguratsiyasi - SSL/TLS ni to'g'ri sozlash
     const redisConfig = {
       socket: {
@@ -47,15 +48,15 @@ async function initRedis() {
           tls: {
             rejectUnauthorized: false, // Self-signed sertifikatlar uchun
             // Agar kerak bo'lsa qo'shimcha TLS sozlamalar
-          }
-        })
+          },
+        }),
       },
       password: process.env.REDIS_PASSWORD,
       // Connection retry strategiyasi
       retry: {
         retries: 3,
-        delay: (attempt) => Math.min(attempt * 50, 500)
-      }
+        delay: (attempt) => Math.min(attempt * 50, 500),
+      },
     };
 
     // Agar TLS kerak bo'lmasa, uni umuman qo'shmaslik
@@ -69,9 +70,9 @@ async function initRedis() {
     redisClient.on("error", (err) => {
       console.error("Redis xatolik:", err);
       isRedisConnected = false;
-      
+
       // Agar SSL xatolik bo'lsa, TLS ni o'chirish
-      if (err.code === 'ERR_SSL_PACKET_LENGTH_TOO_LONG') {
+      if (err.code === "ERR_SSL_PACKET_LENGTH_TOO_LONG") {
         console.log("SSL xatolik aniqlandi, TLS ni o'chirish...");
         process.env.REDIS_TLS = "false";
       }
@@ -93,31 +94,33 @@ async function initRedis() {
 
     // Timeout bilan ulanish
     const connectPromise = redisClient.connect();
-    const timeoutPromise = new Promise((_, reject) => 
-      setTimeout(() => reject(new Error('Redis connection timeout')), 20000)
+    const timeoutPromise = new Promise((_, reject) =>
+      setTimeout(() => reject(new Error("Redis connection timeout")), 20000)
     );
-    
+
     await Promise.race([connectPromise, timeoutPromise]);
     isRedisConnected = true;
     console.log("Redis muvaffaqiyatli ulandi!");
-    
+
     await initDefaultData();
     return redisClient;
-    
   } catch (error) {
     console.error("Redis ulanishida xatolik:", error);
     isRedisConnected = false;
-    
+
     // Agar SSL xatolik bo'lsa, TLS ni o'chirib qayta urinish
-    if (error.code === 'ERR_SSL_PACKET_LENGTH_TOO_LONG' && process.env.REDIS_TLS === "true") {
+    if (
+      error.code === "ERR_SSL_PACKET_LENGTH_TOO_LONG" &&
+      process.env.REDIS_TLS === "true"
+    ) {
       console.log("SSL xatolik tufayli TLS ni o'chirib qayta urinish...");
       process.env.REDIS_TLS = "false";
       return await initRedis(); // Recursive call
     }
-    
+
     throw error;
   }
-} 
+}
 
 // Default ma'lumotlarni o'rnatish
 async function initDefaultData() {
@@ -130,7 +133,8 @@ async function initDefaultData() {
         kino: "0",
         kino2: "0",
         movie_channel: "",
-        ads_text: "🎬 Kinolarni bepul tomosha qiling!\n\n📢 Kanalimiz: %kino%\n👨‍💼 Admin: @%admin%",
+        ads_text:
+          "🎬 Kinolarni bepul tomosha qiling!\n\n📢 Kanalimiz: %kino%\n👨‍💼 Admin: @%admin%",
       });
     }
 
@@ -261,8 +265,13 @@ class RedisDB {
       if (exists) {
         await redisClient.del(`movie:${movieId}`);
         await redisClient.sRem("movies:all", movieId);
-        const deletedCount = (await redisClient.hGet("settings", "kino2")) || "0";
-        await redisClient.hSet("settings", "kino2", (Number.parseInt(deletedCount) + 1).toString());
+        const deletedCount =
+          (await redisClient.hGet("settings", "kino2")) || "0";
+        await redisClient.hSet(
+          "settings",
+          "kino2",
+          (Number.parseInt(deletedCount) + 1).toString()
+        );
         return true;
       }
       return false;
@@ -283,7 +292,9 @@ class RedisDB {
           movies.push(movieData);
         }
       }
-      return movies.sort((a, b) => Number.parseInt(a.id) - Number.parseInt(b.id));
+      return movies.sort(
+        (a, b) => Number.parseInt(a.id) - Number.parseInt(b.id)
+      );
     } catch (error) {
       console.error("Barcha kinolarni olishda xatolik:", error);
       return [];
@@ -351,9 +362,13 @@ class RedisDB {
 
   static async getAdsText() {
     try {
-      if (!this.checkRedisClient()) return "🎬 Kinolarni bepul tomosha qiling!\n\n📢 Kanalimiz: %kino%\n👨‍💼 Admin: @%admin%";
+      if (!this.checkRedisClient())
+        return "🎬 Kinolarni bepul tomosha qiling!\n\n📢 Kanalimiz: %kino%\n👨‍💼 Admin: @%admin%";
       const adsText = await redisClient.hGet("settings", "ads_text");
-      return adsText || "🎬 Kinolarni bepul tomosha qiling!\n\n📢 Kanalimiz: %kino%\n👨‍💼 Admin: @%admin%";
+      return (
+        adsText ||
+        "🎬 Kinolarni bepul tomosha qiling!\n\n📢 Kanalimiz: %kino%\n👨‍💼 Admin: @%admin%"
+      );
     } catch (error) {
       console.error("Reklama matnini olishda xatolik:", error);
       return "🎬 Kinolarni bepul tomosha qiling!\n\n📢 Kanalimiz: %kino%\n👨‍💼 Admin: @%admin%";
@@ -393,7 +408,11 @@ class RedisDB {
       if (!this.checkRedisClient()) return;
       await redisClient.sAdd("channels:mandatory", channelId.toString());
       if (channelUrl) {
-        await redisClient.hSet("channels:urls", channelId.toString(), channelUrl);
+        await redisClient.hSet(
+          "channels:urls",
+          channelId.toString(),
+          channelUrl
+        );
       }
       console.log(`Majburiy kanal qo'shildi: ${channelId}, URL: ${channelUrl}`);
     } catch (error) {
@@ -437,7 +456,10 @@ class RedisDB {
   static async addChannelRequest(channelId, userId) {
     try {
       if (!this.checkRedisClient()) return;
-      await redisClient.sAdd(`channel:requests:${channelId}`, userId.toString());
+      await redisClient.sAdd(
+        `channel:requests:${channelId}`,
+        userId.toString()
+      );
     } catch (error) {
       console.error("Kanal so'rovini qo'shishda xatolik:", error);
     }
@@ -446,7 +468,10 @@ class RedisDB {
   static async isUserRequested(channelId, userId) {
     try {
       if (!this.checkRedisClient()) return false;
-      return await redisClient.sIsMember(`channel:requests:${channelId}`, userId.toString());
+      return await redisClient.sIsMember(
+        `channel:requests:${channelId}`,
+        userId.toString()
+      );
     } catch (error) {
       return false;
     }
@@ -457,7 +482,11 @@ class RedisDB {
       if (!this.checkRedisClient()) return;
       await redisClient.sAdd("channels:join_request", channelId.toString());
       if (channelUrl) {
-        await redisClient.hSet("channels:join_urls", channelId.toString(), channelUrl);
+        await redisClient.hSet(
+          "channels:join_urls",
+          channelId.toString(),
+          channelUrl
+        );
       }
       console.log(`Zayavka kanali qo'shildi: ${channelId}, URL: ${channelUrl}`);
     } catch (error) {
@@ -531,13 +560,13 @@ async function getName(id) {
 async function joinchat(userId) {
   try {
     console.log(`Checking channel membership for user ${userId}`);
-    
+
     const mandatoryChannels = await RedisDB.getMandatoryChannels();
     const joinRequestChannels = await RedisDB.getJoinRequestChannels();
-    
+
     console.log(`Mandatory channels:`, mandatoryChannels);
     console.log(`Join request channels:`, joinRequestChannels);
-    
+
     const allChannels = [...mandatoryChannels, ...joinRequestChannels];
 
     if (allChannels.length === 0) {
@@ -548,39 +577,46 @@ async function joinchat(userId) {
     let uns = false;
     const inlineKeyboard = [];
 
+    // Majburiy kanallarni tekshirish
     for (const channelId of mandatoryChannels) {
       try {
-        console.log(`Checking mandatory channel ${channelId} for user ${userId}`);
-        
+        console.log(
+          `Checking mandatory channel ${channelId} for user ${userId}`
+        );
+
         const url = await RedisDB.getChannelUrl(channelId);
-        
-        // Retry mexanizmi
+
         let chat, chatMember;
-        let retries = 2; // Reduced retries for faster response
-        
+        let retries = 2;
+
         while (retries > 0) {
           try {
             chat = await bot.getChat(channelId);
             chatMember = await bot.getChatMember(channelId, userId);
             break;
           } catch (error) {
-            console.log(`Channel check error for ${channelId} (retries left: ${retries-1}):`, error.message);
+            console.log(
+              `Channel check error for ${channelId} (retries left: ${
+                retries - 1
+              }):`,
+              error.message
+            );
             retries--;
             if (retries === 0) {
-              // Channel mavjud emas yoki API xatolik - skip this channel
-              console.log(`Skipping channel ${channelId} due to persistent errors`);
-              continue;
+              console.log(
+                `Skipping channel ${channelId} due to persistent errors`
+              );
+              throw error;
             }
-            // 500ms kutish
-            await new Promise(resolve => setTimeout(resolve, 500));
+            await new Promise((resolve) => setTimeout(resolve, 500));
           }
         }
-        
+
         if (!chat || !chatMember) {
           console.log(`Could not get data for channel ${channelId}, skipping`);
           continue;
         }
-        
+
         let status = chatMember.status;
         console.log(`User ${userId} status in channel ${channelId}: ${status}`);
 
@@ -610,52 +646,56 @@ async function joinchat(userId) {
         }
       } catch (error) {
         console.error(`Error checking mandatory channel ${channelId}:`, error);
-        // Skip this channel instead of failing completely
         continue;
       }
     }
-          inlineKeyboard.push([
-            {
-              text: `❌ ${chat.title}`,
-              url: url || `https://t.me/${chat.username || "durov"}`,
-            },
-          ]);
-          uns = true;
-        }
-      } catch (error) {
-        console.error(`Majburiy kanal tekshirishda xatolik (${channelId}):`, error.message);
-        // Kanal mavjud bo'lmasa, uni e'tiborsiz qoldirish
-        if (error.code === 'ETELEGRAM' && error.response?.body?.description?.includes('not found')) {
-          console.log(`Kanal topilmadi: ${channelId}`);
-          continue;
-        }
-        uns = true;
-      }
-    }
 
+    // Zayavka kanallarni tekshirish
     for (const channelId of joinRequestChannels) {
       try {
+        console.log(
+          `Checking join request channel ${channelId} for user ${userId}`
+        );
+
         const url = await RedisDB.getJoinRequestChannelUrl(channelId);
-        
-        // Retry mexanizmi
+
         let chat, chatMember;
-        let retries = 3;
-        
+        let retries = 2;
+
         while (retries > 0) {
           try {
             chat = await bot.getChat(channelId);
             chatMember = await bot.getChatMember(channelId, userId);
             break;
           } catch (error) {
-            console.log(`Zayavka kanal tekshirishda xatolik (qolgan urinish: ${retries-1}):`, error.message);
+            console.log(
+              `Join channel check error for ${channelId} (retries left: ${
+                retries - 1
+              }):`,
+              error.message
+            );
             retries--;
-            if (retries === 0) throw error;
-            // 1 sekund kutish
-            await new Promise(resolve => setTimeout(resolve, 1000));
+            if (retries === 0) {
+              console.log(
+                `Skipping join request channel ${channelId} due to persistent errors`
+              );
+              throw error;
+            }
+            await new Promise((resolve) => setTimeout(resolve, 500));
           }
         }
-        
+
+        if (!chat || !chatMember) {
+          console.log(
+            `Could not get data for join request channel ${channelId}, skipping`
+          );
+          continue;
+        }
+
         let status = chatMember.status;
+        console.log(
+          `User ${userId} status in join request channel ${channelId}: ${status}`
+        );
 
         if (status === "left") {
           const isRequested = await RedisDB.isUserRequested(channelId, userId);
@@ -679,19 +719,24 @@ async function joinchat(userId) {
             },
           ]);
           uns = true;
+          console.log(
+            `User ${userId} needs to send join request to channel ${channelId}`
+          );
         }
       } catch (error) {
-        console.error(`Zayavka kanal tekshirishda xatolik (${channelId}):`, error.message);
-        // Kanal mavjud bo'lmasa, uni e'tiborsiz qoldirish
-        if (error.code === 'ETELEGRAM' && error.response?.body?.description?.includes('not found')) {
-          console.log(`Zayavka kanali topilmadi: ${channelId}`);
-          continue;
-        }
-        uns = true;
+        console.error(
+          `Error checking join request channel ${channelId}:`,
+          error
+        );
+        continue;
       }
     }
 
     if (uns) {
+      console.log(
+        `User ${userId} failed channel membership check, sending subscription message`
+      );
+
       inlineKeyboard.push([
         {
           text: "✅ Tekshirish",
@@ -708,17 +753,25 @@ async function joinchat(userId) {
             reply_markup: { inline_keyboard: inlineKeyboard },
           }
         );
+        console.log(`Subscription message sent to user ${userId}`);
       } catch (error) {
-        console.error("Kanal obuna xabarini yuborishda xatolik:", error);
+        console.error(
+          `Error sending subscription message to user ${userId}:`,
+          error
+        );
       }
       return false;
     }
 
+    console.log(`User ${userId} passed all channel checks`);
     return true;
   } catch (error) {
-    console.error(`Joinchat funksiyasida umumiy xatolik for user ${userId}:`, error);
+    console.error(
+      `General error in joinchat function for user ${userId}:`,
+      error
+    );
     console.log(`Returning true to allow bot to continue for user ${userId}`);
-    return true; // Xatolik bo'lsa ham botni ishlashga ruxsat berish
+    return true;
   }
 }
 
@@ -762,7 +815,7 @@ async function setupBotHandlers() {
 
         let user = await RedisDB.getUser(userId);
         console.log(`User data:`, user);
-        
+
         if (user && user.ban === "1") {
           console.log(`User ${userId} is banned`);
           return;
@@ -780,17 +833,17 @@ async function setupBotHandlers() {
         console.log(`Checking channel membership for user ${userId}`);
         const joinResult = await joinchat(userId);
         console.log(`Join check result:`, joinResult);
-        
+
         if (!joinResult) {
           console.log(`User ${userId} failed channel check`);
           return;
         }
 
         console.log(`Preparing start message for user ${userId}`);
-        
+
         const kino_id = await RedisDB.getMovieChannel();
         console.log(`Movie channel ID:`, kino_id);
-        
+
         let kino = "";
         let kinoUrl = "";
 
@@ -802,7 +855,9 @@ async function setupBotHandlers() {
               kinoUrl = `https://t.me/${kino}`;
             } else {
               kino = chat.title || "Kino Kanali";
-              kinoUrl = `https://t.me/c/${Math.abs(kino_id).toString().slice(4)}`;
+              kinoUrl = `https://t.me/c/${Math.abs(kino_id)
+                .toString()
+                .slice(4)}`;
             }
             console.log(`Movie channel info: ${kino}, URL: ${kinoUrl}`);
           } catch (error) {
@@ -814,13 +869,13 @@ async function setupBotHandlers() {
 
         const startTextBase64 = await RedisDB.getText("start");
         console.log(`Start text base64:`, startTextBase64);
-        
+
         const startText = startTextBase64
           ? Buffer.from(startTextBase64, "base64").toString()
           : "👋 Assalomu alaykum {name}  botimizga xush kelibsiz.\n\n✅🎭 Kino kodini yuboring.";
-        
+
         console.log(`Start text decoded:`, startText);
-        
+
         const currentTime = moment().format("DD.MM.YYYY | HH:mm");
         const message = startText
           .replace("{name}", `<a href="tg://user?id=${userId}">${name}</a>`)
@@ -846,24 +901,29 @@ async function setupBotHandlers() {
         };
 
         console.log(`Sending start message to user ${userId}`);
-        
+
         await bot.sendMessage(chatId, message, {
           parse_mode: "HTML",
           reply_markup: keyboard,
         });
 
         console.log(`Start message sent successfully to user ${userId}`);
-        
       } catch (error) {
         console.error(`/start command error for user ${userId}:`, error);
-        
+
         // Fallback message
         try {
           console.log(`Sending fallback message to user ${userId}`);
-          await bot.sendMessage(chatId, "👋 Assalomu alaykum! Botga xush kelibsiz.\n\n🎬 Kino kodini yuboring:");
+          await bot.sendMessage(
+            chatId,
+            "👋 Assalomu alaykum! Botga xush kelibsiz.\n\n🎬 Kino kodini yuboring:"
+          );
           console.log(`Fallback message sent to user ${userId}`);
         } catch (fallbackError) {
-          console.error(`Fallback message ham yuborilmadi user ${userId}:`, fallbackError);
+          console.error(
+            `Fallback message ham yuborilmadi user ${userId}:`,
+            fallbackError
+          );
         }
       }
     });
@@ -883,9 +943,13 @@ async function setupBotHandlers() {
       try {
         const movieCount = await RedisDB.getMovieCount();
         if (movieCount === 0) {
-          await bot.sendMessage(chatId, "<b>📛 Hozircha kinolar mavjud emas!</b>", {
-            parse_mode: "HTML",
-          });
+          await bot.sendMessage(
+            chatId,
+            "<b>📛 Hozircha kinolar mavjud emas!</b>",
+            {
+              parse_mode: "HTML",
+            }
+          );
           return;
         }
 
@@ -908,10 +972,15 @@ async function setupBotHandlers() {
                 kinoUrl = `https://t.me/${kino}`;
               } else {
                 kino = chat.title || "Kino Kanali";
-                kinoUrl = `https://t.me/c/${Math.abs(kino_id).toString().slice(4)}`;
+                kinoUrl = `https://t.me/c/${Math.abs(kino_id)
+                  .toString()
+                  .slice(4)}`;
               }
             } catch (error) {
-              console.error("Kino kanal ma'lumotlarini olishda xatolik:", error);
+              console.error(
+                "Kino kanal ma'lumotlarini olishda xatolik:",
+                error
+              );
               kino = "";
               kinoUrl = "";
             }
@@ -929,7 +998,12 @@ async function setupBotHandlers() {
                   url: `https://t.me/share/url/?url=https://t.me/${bot_username}?start=${randomId}`,
                 },
               ],
-              [{ text: "🔎 Boshqa kodlar", url: kinoUrl || `https://t.me/durov` }],
+              [
+                {
+                  text: "🔎 Boshqa kodlar",
+                  url: kinoUrl || `https://t.me/durov`,
+                },
+              ],
               [{ text: "🎲 Yana tasodifiy", callback_data: "random_movie" }],
             ],
           };
@@ -946,7 +1020,10 @@ async function setupBotHandlers() {
         }
       } catch (error) {
         console.error("Tasodifiy kino olishda xatolik:", error);
-        await bot.sendMessage(chatId, "⚠️ Tasodifiy kino olishda xatolik yuz berdi!");
+        await bot.sendMessage(
+          chatId,
+          "⚠️ Tasodifiy kino olishda xatolik yuz berdi!"
+        );
       }
     });
 
@@ -990,10 +1067,15 @@ async function setupBotHandlers() {
                 if (chat.username) {
                   kinoUrl = `https://t.me/${chat.username}`;
                 } else {
-                  kinoUrl = `https://t.me/c/${Math.abs(kino_id).toString().slice(4)}`;
+                  kinoUrl = `https://t.me/c/${Math.abs(kino_id)
+                    .toString()
+                    .slice(4)}`;
                 }
               } catch (error) {
-                console.error("Kino kanal ma'lumotlarini olishda xatolik:", error);
+                console.error(
+                  "Kino kanal ma'lumotlarini olishda xatolik:",
+                  error
+                );
                 kinoUrl = "";
               }
             }
@@ -1048,7 +1130,10 @@ async function setupBotHandlers() {
             const movie = await RedisDB.getMovie(randomId.toString());
 
             if (movie) {
-              const filmName = Buffer.from(movie.film_name, "base64").toString();
+              const filmName = Buffer.from(
+                movie.film_name,
+                "base64"
+              ).toString();
               const reklama = await RedisDB.getAdsText();
               const bot_username = (await bot.getMe()).username;
               const kino_id = await RedisDB.getMovieChannel();
@@ -1063,10 +1148,15 @@ async function setupBotHandlers() {
                     kinoUrl = `https://t.me/${kino}`;
                   } else {
                     kino = chat.title || "Kino Kanali";
-                    kinoUrl = `https://t.me/c/${Math.abs(kino_id).toString().slice(4)}`;
+                    kinoUrl = `https://t.me/c/${Math.abs(kino_id)
+                      .toString()
+                      .slice(4)}`;
                   }
                 } catch (error) {
-                  console.error("Kino kanal ma'lumotlarini olishda xatolik:", error);
+                  console.error(
+                    "Kino kanal ma'lumotlarini olishda xatolik:",
+                    error
+                  );
                   kino = "";
                   kinoUrl = "";
                 }
@@ -1090,7 +1180,12 @@ async function setupBotHandlers() {
                       url: kinoUrl || `https://t.me/durov`,
                     },
                   ],
-                  [{ text: "🎲 Yana tasodifiy", callback_data: "random_movie" }],
+                  [
+                    {
+                      text: "🎲 Yana tasodifiy",
+                      callback_data: "random_movie",
+                    },
+                  ],
                 ],
               };
 
@@ -1118,14 +1213,18 @@ async function setupBotHandlers() {
             }
           } catch (error) {
             console.error("Tasodifiy kino callback xatolik:", error);
-            await bot.answerCallbackQuery(query.id, { text: "Xatolik yuz berdi!" });
+            await bot.answerCallbackQuery(query.id, {
+              text: "Xatolik yuz berdi!",
+            });
           }
         }
 
         await bot.answerCallbackQuery(query.id);
       } catch (error) {
         console.error("Callback query ishlov berish xatolik:", error);
-        await bot.answerCallbackQuery(query.id, { text: "Xatolik yuz berdi!" }).catch(() => {});
+        await bot
+          .answerCallbackQuery(query.id, { text: "Xatolik yuz berdi!" })
+          .catch(() => {});
       }
     });
 
@@ -1171,7 +1270,10 @@ async function setupBotHandlers() {
           try {
             const movie = await RedisDB.getMovie(searchCode);
             if (movie) {
-              const filmName = Buffer.from(movie.film_name, "base64").toString();
+              const filmName = Buffer.from(
+                movie.film_name,
+                "base64"
+              ).toString();
               const reklama = await RedisDB.getAdsText();
               const bot_username = (await bot.getMe()).username;
               const kino_id = await RedisDB.getMovieChannel();
@@ -1186,10 +1288,15 @@ async function setupBotHandlers() {
                     kinoUrl = `https://t.me/${kino}`;
                   } else {
                     kino = chat.title || "Kino Kanali";
-                    kinoUrl = `https://t.me/c/${Math.abs(kino_id).toString().slice(4)}`;
+                    kinoUrl = `https://t.me/c/${Math.abs(kino_id)
+                      .toString()
+                      .slice(4)}`;
                   }
                 } catch (error) {
-                  console.error("Kino kanal ma'lumotlarini olishda xatolik:", error);
+                  console.error(
+                    "Kino kanal ma'lumotlarini olishda xatolik:",
+                    error
+                  );
                   kino = "";
                   kinoUrl = "";
                 }
@@ -1234,12 +1341,19 @@ async function setupBotHandlers() {
             }
           } catch (error) {
             console.error("Kino qidirishda xatolik:", error);
-            await bot.sendMessage(chatId, "⚠️ Kino qidirishda xatolik yuz berdi!");
+            await bot.sendMessage(
+              chatId,
+              "⚠️ Kino qidirishda xatolik yuz berdi!"
+            );
           }
         } else {
-          await bot.sendMessage(chatId, "<b>📛 Faqat raqamlardan foydalaning!</b>", {
-            parse_mode: "HTML",
-          });
+          await bot.sendMessage(
+            chatId,
+            "<b>📛 Faqat raqamlardan foydalaning!</b>",
+            {
+              parse_mode: "HTML",
+            }
+          );
         }
         return;
       }
@@ -1266,7 +1380,10 @@ async function setupBotHandlers() {
     // Chat member update ishlovchisi
     bot.on("chat_member", async (update) => {
       try {
-        if (update.new_chat_member && update.new_chat_member.status === "kicked") {
+        if (
+          update.new_chat_member &&
+          update.new_chat_member.status === "kicked"
+        ) {
           await RedisDB.updateUser(update.from.id, { sana: "tark" });
         }
       } catch (error) {
@@ -1373,11 +1490,13 @@ async function handleStepBasedCommands(msg, user) {
     // Video yuklash
     if (step === "movie" && msg.video) {
       const tempId = uuidv4();
-      
+
       // Redis'da temp ma'lumot saqlash
       await redisClient.hSet(`film:${tempId}`, {
         file_id: msg.video.file_id,
-        file_name: Buffer.from(msg.video.file_name || "video").toString("base64"),
+        file_name: Buffer.from(msg.video.file_name || "video").toString(
+          "base64"
+        ),
       });
 
       await bot.sendMessage(chatId, "<b>🎬 Kino ma'lumotini yuboring:</b>", {
@@ -1390,7 +1509,7 @@ async function handleStepBasedCommands(msg, user) {
     // Caption qo'shish
     if (step === "caption" && text && text !== "🎬 Kino qo'shish") {
       const tempId = user.temp_id;
-      
+
       // Caption ni redisga yozamiz
       await redisClient.hSet(`film:${tempId}`, {
         caption: Buffer.from(text).toString("base64"),
@@ -1427,11 +1546,11 @@ async function handleStepBasedCommands(msg, user) {
 // Main handler function
 export default async function handler(req, res) {
   console.log(`Request received: ${req.method} ${req.url}`);
-  
+
   try {
     // Initialize Redis connection
     await initRedis();
-    
+
     // Setup bot handlers
     await setupBotHandlers();
 
@@ -1439,7 +1558,7 @@ export default async function handler(req, res) {
       // Handle webhook
       const update = req.body;
       console.log("Webhook update received:", JSON.stringify(update, null, 2));
-      
+
       try {
         await bot.processUpdate(update);
         console.log("Update processed successfully");
@@ -1447,7 +1566,7 @@ export default async function handler(req, res) {
         console.error("Update processing error:", processError);
         // Xatolikka qaramay 200 qaytarish
       }
-      
+
       res.status(200).json({ ok: true, timestamp: new Date().toISOString() });
     } else if (req.method === "GET") {
       // Health check
@@ -1456,9 +1575,9 @@ export default async function handler(req, res) {
         timestamp: new Date().toISOString(),
         redis_connected: isRedisConnected,
         bot_token_exists: !!API_KEY,
-        webhook_url: WEBHOOK_URL
+        webhook_url: WEBHOOK_URL,
       };
-      
+
       console.log("Health check:", status);
       res.status(200).json(status);
     } else {
@@ -1467,10 +1586,10 @@ export default async function handler(req, res) {
   } catch (error) {
     console.error("Handler global error:", error);
     // Xatolikka qaramay ham 200 qaytarish (Telegram webhook uchun)
-    res.status(200).json({ 
-      ok: false, 
+    res.status(200).json({
+      ok: false,
       error: error.message,
-      timestamp: new Date().toISOString()
+      timestamp: new Date().toISOString(),
     });
   }
 }
