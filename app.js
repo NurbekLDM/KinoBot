@@ -17,7 +17,7 @@ dotenv.config();
 
 // Telegram Bot konfiguratsiyasi
 const API_KEY = process.env.BOT_TOKEN;
-const USE_WEBHOOK = process.env.USE_WEBHOOK === 'true';
+const USE_WEBHOOK = 'true';
 const WEBHOOK_URL = "https://bugunfilm-nurbeks-projects-f4894644.vercel.app/";
 
 // Bot ni webhook yoki polling rejimida ishga tushirish
