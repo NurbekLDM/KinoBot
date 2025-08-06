@@ -117,7 +117,7 @@ async function initRedis() {
     
     throw error;
   }
-}
+} 
 
 // Default ma'lumotlarni o'rnatish
 async function initDefaultData() {
