@@ -793,19 +793,409 @@ const panel = createKeyboard([
   [{ text: "⬇️ Panelni Yopish" }],
 ]);
 
+// Direct webhook update handler
+async function handleWebhookUpdate(update) {
+  try {
+    console.log("Processing webhook update:", JSON.stringify(update, null, 2));
+
+    // Handle message
+    if (update.message) {
+      await handleMessage(update.message);
+      return;
+    }
+
+    // Handle callback query
+    if (update.callback_query) {
+      await handleCallbackQuery(update.callback_query);
+      return;
+    }
+
+    // Handle chat join request
+    if (update.chat_join_request) {
+      await handleChatJoinRequest(update.chat_join_request);
+      return;
+    }
+
+    // Handle chat member update
+    if (update.chat_member) {
+      await handleChatMember(update.chat_member);
+      return;
+    }
+
+    console.log("Unhandled update type:", Object.keys(update));
+  } catch (error) {
+    console.error("Webhook update handler error:", error);
+  }
+}
+
+// Handle message
+async function handleMessage(msg) {
+  const chatId = msg.chat.id;
+  const userId = msg.from.id;
+  const text = msg.text;
+
+  console.log(`Message received from user ${userId}: ${text}`);
+
+  if (msg.chat.type !== "private") {
+    console.log(`Ignoring non-private chat: ${msg.chat.type}`);
+    return;
+  }
+
+  // Handle /start command
+  if (text && text.startsWith("/start")) {
+    await handleStartCommand(msg);
+    return;
+  }
+
+  // Handle /rand command
+  if (text === "/rand") {
+    await handleRandCommand(msg);
+    return;
+  }
+
+  // Handle admin commands
+  if (
+    text &&
+    (text === "/panel" || text === "/a" || text === "/admin" || text === "/p")
+  ) {
+    await handleAdminPanel(msg);
+    return;
+  }
+
+  // Handle regular messages
+  if (text && !text.startsWith("/")) {
+    await handleRegularMessage(msg);
+    return;
+  }
+}
+
+// Handle /start command
+async function handleStartCommand(msg) {
+  const chatId = msg.chat.id;
+  const userId = msg.from.id;
+  const name = msg.from.first_name;
+
+  console.log(`START COMMAND: User ${userId} (${name}) in chat ${chatId}`);
+
+  try {
+    let user = await RedisDB.getUser(userId);
+    console.log(`User data:`, user);
+
+    if (user && user.ban === "1") {
+      console.log(`User ${userId} is banned`);
+      return;
+    }
+
+    if (!user) {
+      console.log(`Creating new user ${userId}`);
+      user = await RedisDB.createUser(userId);
+      console.log(`User created:`, user);
+    } else {
+      console.log(`Updating existing user ${userId}`);
+      await RedisDB.updateUser(userId, { lastmsg: "start", step: "0" });
+    }
+
+    console.log(`Checking channel membership for user ${userId}`);
+    const joinResult = await joinchat(userId);
+    console.log(`Join check result:`, joinResult);
+
+    if (!joinResult) {
+      console.log(`User ${userId} failed channel check`);
+      return;
+    }
+
+    console.log(`Preparing start message for user ${userId}`);
+
+    const kino_id = await RedisDB.getMovieChannel();
+    console.log(`Movie channel ID:`, kino_id);
+
+    let kino = "";
+    let kinoUrl = "";
+
+    if (kino_id) {
+      try {
+        const chat = await bot.getChat(kino_id);
+        if (chat.username) {
+          kino = chat.username;
+          kinoUrl = `https://t.me/${kino}`;
+        } else {
+          kino = chat.title || "Kino Kanali";
+          kinoUrl = `https://t.me/c/${Math.abs(kino_id).toString().slice(4)}`;
+        }
+        console.log(`Movie channel info: ${kino}, URL: ${kinoUrl}`);
+      } catch (error) {
+        console.error("Kino kanal ma'lumotlarini olishda xatolik:", error);
+        kino = "";
+        kinoUrl = "";
+      }
+    }
+
+    const startTextBase64 = await RedisDB.getText("start");
+    console.log(`Start text base64:`, startTextBase64);
+
+    const startText = startTextBase64
+      ? Buffer.from(startTextBase64, "base64").toString()
+      : "👋 Assalomu alaykum {name}  botimizga xush kelibsiz.\n\n✅🎭 Kino kodini yuboring.";
+
+    console.log(`Start text decoded:`, startText);
+
+    const currentTime = moment().format("DD.MM.YYYY | HH:mm");
+    const message = startText
+      .replace("{name}", `<a href="tg://user?id=${userId}">${name}</a>`)
+      .replace("{time}", currentTime);
+
+    console.log(`Final message:`, message);
+
+    const keyboard = {
+      inline_keyboard: [
+        [
+          {
+            text: "🔎 Kodlarni qidirish",
+            url: kinoUrl || `https://t.me/durov`,
+          },
+        ],
+        [
+          {
+            text: "🎲 Tasodifiy kino",
+            callback_data: "random_movie",
+          },
+        ],
+      ],
+    };
+
+    console.log(`Sending start message to user ${userId}`);
+
+    await bot.sendMessage(chatId, message, {
+      parse_mode: "HTML",
+      reply_markup: keyboard,
+    });
+
+    console.log(`Start message sent successfully to user ${userId}`);
+  } catch (error) {
+    console.error(`/start command error for user ${userId}:`, error);
+
+    // Fallback message
+    try {
+      console.log(`Sending fallback message to user ${userId}`);
+      await bot.sendMessage(
+        chatId,
+        "👋 Assalomu alaykum! Botga xush kelibsiz.\n\n🎬 Kino kodini yuboring:"
+      );
+      console.log(`Fallback message sent to user ${userId}`);
+    } catch (fallbackError) {
+      console.error(
+        `Fallback message ham yuborilmadi user ${userId}:`,
+        fallbackError
+      );
+    }
+  }
+}
+
+// Handle /rand command
+async function handleRandCommand(msg) {
+  const chatId = msg.chat.id;
+  const userId = msg.from.id;
+
+  console.log(`Random command from user ${userId}`);
+
+  try {
+    const joinResult = await joinchat(userId);
+    if (!joinResult) {
+      console.log(`User ${userId} failed channel check for /rand`);
+      return;
+    }
+
+    const movies = await RedisDB.getAllMovies();
+    if (!movies || movies.length === 0) {
+      await bot.sendMessage(chatId, "❌ Hozircha kinolar mavjud emas.");
+      return;
+    }
+
+    const randomMovie = movies[Math.floor(Math.random() * movies.length)];
+    const movieData = await RedisDB.getMovie(randomMovie);
+
+    if (movieData) {
+      await bot.sendMessage(chatId, movieData, { parse_mode: "HTML" });
+    } else {
+      await bot.sendMessage(chatId, "❌ Tasodifiy kino topilmadi.");
+    }
+  } catch (error) {
+    console.error(`Random command error for user ${userId}:`, error);
+  }
+}
+
+// Handle admin panel
+async function handleAdminPanel(msg) {
+  const chatId = msg.chat.id;
+  const userId = msg.from.id;
+
+  console.log(`Admin panel request from user ${userId}`);
+
+  try {
+    const admins = await RedisDB.getAdminIds();
+    if (!admins.includes(userId)) {
+      await bot.sendMessage(chatId, "❌ Sizda admin huquqlari yo'q.");
+      return;
+    }
+
+    const adminKeyboard = {
+      inline_keyboard: [
+        [
+          { text: "📊 Statistika", callback_data: "admin_stats" },
+          { text: "📢 Kanallar", callback_data: "admin_channels" },
+        ],
+        [
+          { text: "🎬 Kinolar", callback_data: "admin_movies" },
+          { text: "👥 Foydalanuvchilar", callback_data: "admin_users" },
+        ],
+        [{ text: "⚙️ Sozlamalar", callback_data: "admin_settings" }],
+      ],
+    };
+
+    await bot.sendMessage(chatId, "🔧 Admin Panel", {
+      reply_markup: adminKeyboard,
+    });
+  } catch (error) {
+    console.error(`Admin panel error for user ${userId}:`, error);
+  }
+}
+
+// Handle regular messages (movie codes)
+async function handleRegularMessage(msg) {
+  const chatId = msg.chat.id;
+  const userId = msg.from.id;
+  const text = msg.text;
+
+  console.log(`Regular message from user ${userId}: ${text}`);
+
+  try {
+    const joinResult = await joinchat(userId);
+    if (!joinResult) {
+      console.log(`User ${userId} failed channel check for regular message`);
+      return;
+    }
+
+    // Try to find movie by code
+    const movieData = await RedisDB.getMovie(text);
+    if (movieData) {
+      await bot.sendMessage(chatId, movieData, { parse_mode: "HTML" });
+      console.log(`Movie found and sent to user ${userId}: ${text}`);
+    } else {
+      await bot.sendMessage(chatId, "❌ Bunday kodli kino topilmadi.");
+      console.log(`Movie not found for user ${userId}: ${text}`);
+    }
+  } catch (error) {
+    console.error(`Regular message error for user ${userId}:`, error);
+  }
+}
+
+// Handle callback queries
+async function handleCallbackQuery(query) {
+  const chatId = query.message.chat.id;
+  const userId = query.from.id;
+  const data = query.data;
+
+  console.log(`Callback query from user ${userId}: ${data}`);
+
+  try {
+    await bot.answerCallbackQuery(query.id);
+
+    if (data === "check") {
+      const joinResult = await joinchat(userId);
+      if (joinResult) {
+        await bot.editMessageText("✅ Barcha kanallarga obuna bo'ldingiz!", {
+          chat_id: chatId,
+          message_id: query.message.message_id,
+        });
+      }
+    } else if (data === "random_movie") {
+      const movies = await RedisDB.getAllMovies();
+      if (movies && movies.length > 0) {
+        const randomMovie = movies[Math.floor(Math.random() * movies.length)];
+        const movieData = await RedisDB.getMovie(randomMovie);
+        if (movieData) {
+          await bot.sendMessage(chatId, movieData, { parse_mode: "HTML" });
+        }
+      } else {
+        await bot.sendMessage(chatId, "❌ Hozircha kinolar mavjud emas.");
+      }
+    } else if (data.startsWith("admin_")) {
+      // Handle admin callbacks
+      await handleAdminCallback(query, data);
+    }
+  } catch (error) {
+    console.error(`Callback query error for user ${userId}:`, error);
+  }
+}
+
+// Handle admin callbacks
+async function handleAdminCallback(query, data) {
+  const chatId = query.message.chat.id;
+  const userId = query.from.id;
+
+  const admins = await RedisDB.getAdminIds();
+  if (!admins.includes(userId)) {
+    await bot.sendMessage(chatId, "❌ Sizda admin huquqlari yo'q.");
+    return;
+  }
+
+  if (data === "admin_stats") {
+    const userCount = await RedisDB.getUserCount();
+    const movieCount = await RedisDB.getMovieCount();
+    const channelCount = (await RedisDB.getMandatoryChannels()).length;
+
+    const statsMessage = `📊 Bot Statistikasi:\n\n👥 Foydalanuvchilar: ${userCount}\n🎬 Kinolar: ${movieCount}\n📢 Kanallar: ${channelCount}`;
+
+    await bot.editMessageText(statsMessage, {
+      chat_id: chatId,
+      message_id: query.message.message_id,
+    });
+  }
+  // Add more admin handlers as needed
+}
+
+// Handle chat join request
+async function handleChatJoinRequest(joinRequest) {
+  const chatId = joinRequest.chat.id;
+  const userId = joinRequest.from.id;
+
+  console.log(`Chat join request from user ${userId} to chat ${chatId}`);
+
+  try {
+    await RedisDB.addChannelRequest(chatId, userId);
+  } catch (error) {
+    console.error(`Chat join request error:`, error);
+  }
+}
+
+// Handle chat member update
+async function handleChatMember(chatMember) {
+  console.log(`Chat member update:`, chatMember);
+  // Handle member updates if needed
+}
+
 const cancel = createKeyboard([[{ text: "◀️ Orqaga" }]]);
 const removeKey = { remove_keyboard: true };
 
-// Bot event handlers
+// Bot event handlers - Global handlers (faqat bir marta o'rnatiladi)
+let handlersSetup = false;
+
 async function setupBotHandlers() {
   try {
+    if (handlersSetup) {
+      console.log("Bot handlers already setup, skipping...");
+      return;
+    }
+
+    console.log("Setting up bot handlers...");
+
     // /start komandasi
     bot.onText(/\/start/, async (msg) => {
       const chatId = msg.chat.id;
       const userId = msg.from.id;
       const name = msg.from.first_name;
 
-      console.log(`Start command received from user ${userId}`);
+      console.log(`START COMMAND: User ${userId} (${name}) in chat ${chatId}`);
 
       try {
         if (msg.chat.type !== "private") {
@@ -900,25 +1290,31 @@ async function setupBotHandlers() {
           ],
         };
 
-        console.log(`Sending start message to user ${userId}`);
+        console.log(`SENDING START MESSAGE to user ${userId}...`);
 
-        await bot.sendMessage(chatId, message, {
+        const result = await bot.sendMessage(chatId, message, {
           parse_mode: "HTML",
           reply_markup: keyboard,
         });
 
-        console.log(`Start message sent successfully to user ${userId}`);
+        console.log(
+          `START MESSAGE SENT successfully to user ${userId}:`,
+          result
+        );
       } catch (error) {
         console.error(`/start command error for user ${userId}:`, error);
 
         // Fallback message
         try {
           console.log(`Sending fallback message to user ${userId}`);
-          await bot.sendMessage(
+          const fallbackResult = await bot.sendMessage(
             chatId,
             "👋 Assalomu alaykum! Botga xush kelibsiz.\n\n🎬 Kino kodini yuboring:"
           );
-          console.log(`Fallback message sent to user ${userId}`);
+          console.log(
+            `Fallback message sent to user ${userId}:`,
+            fallbackResult
+          );
         } catch (fallbackError) {
           console.error(
             `Fallback message ham yuborilmadi user ${userId}:`,
@@ -1551,16 +1947,14 @@ export default async function handler(req, res) {
     // Initialize Redis connection
     await initRedis();
 
-    // Setup bot handlers
-    await setupBotHandlers();
-
     if (req.method === "POST") {
       // Handle webhook
       const update = req.body;
       console.log("Webhook update received:", JSON.stringify(update, null, 2));
 
       try {
-        await bot.processUpdate(update);
+        // Use direct handler instead of bot.processUpdate
+        await handleWebhookUpdate(update);
         console.log("Update processed successfully");
       } catch (processError) {
         console.error("Update processing error:", processError);
