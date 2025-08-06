@@ -717,14 +717,13 @@ bot.onText(/\/dev/, async (msg) => {
 
   const keyboard = {
     inline_keyboard: [
-      [{ text: "👨‍💻 Bot dasturchisi", url: "https://t.me/alimov_ak" }],
-      [{ text: "🔁 Boshqa botlar", url: "https://t.me/alimov_ak" }],
+      [{ text: "👨‍💻 Bot dasturchisi", url: "https://t.me/Nurbek_2255" }],
     ],
   };
 
   await bot.sendMessage(
     chatId,
-    "👨‍💻 <b>Botimiz dasturchisi: @alimov_ak</b>\n\n<i>🤖 Sizga ham shu kabi botlar kerak bo'lsa bizga buyurtma berishingiz mumkin. Sifatli botlar tuzib beramiz.</i>\n\n<b>📊 Na'munalar:</b> @alimov_ak",
+    "👨‍💻 <b>Botimiz dasturchisi: @Nurbek_2255</b>\n\n<i>🤖 Sizga ham shu kabi botlar kerak bo'lsa bizga buyurtma berishingiz mumkin. Sifatli botlar tuzib beramiz.</i>\n\n<b>📊 Na'munalar:</b> @Nurbek_2255",
     {
       parse_mode: "HTML",
       reply_markup: keyboard,
