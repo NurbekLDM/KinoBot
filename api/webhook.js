@@ -1180,13 +1180,7 @@ const cancel = createKeyboard([[{ text: "◀️ Orqaga" }]]);
 const removeKey = { remove_keyboard: true };
 
 // Admin komandalarini ishlov berish
-  try {
-    if (handlersSetup) {
-      console.log("Bot handlers already setup, skipping...");
-      return;
-    }
-
-    console.log("Setting up bot handlers...");
+async function handleAdminCommands(msg, user) {
 
     // /start komandasi
     bot.onText(/\/start/, async (msg) => {
