@@ -7,7 +7,10 @@
   "scripts": {
     "dev": "vercel dev",
     "build": "echo 'Build completed successfully'",
-    "start": "node api/webhook.js"
+    "start": "node api/webhook.js",
+    "setup-webhook": "node scripts/setup-webhook.js",
+    "debug": "node scripts/debug.js",
+    "test": "node scripts/debug.js"
   },
   "dependencies": {
     "dotenv": "^16.3.1",
@@ -18,5 +21,14 @@
   },
   "engines": {
     "node": ">=18.0.0"
-  }
+  },
+  "keywords": [
+    "telegram",
+    "bot",
+    "movie",
+    "vercel",
+    "serverless"
+  ],
+  "author": "Nurbek",
+  "license": "MIT"
 }
