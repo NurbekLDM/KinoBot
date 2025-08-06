@@ -1012,10 +1012,11 @@ async function handleRandCommand(msg) {
     }
 
     const randomMovie = movies[Math.floor(Math.random() * movies.length)];
-    const movieData = await RedisDB.getMovie(randomMovie);
+    console.log(`Random movie selected:`, randomMovie);
 
-    if (movieData) {
-      await bot.sendMessage(chatId, movieData, { parse_mode: "HTML" });
+    if (randomMovie) {
+      const movieText = formatMovieText(randomMovie);
+      await bot.sendMessage(chatId, movieText, { parse_mode: "HTML" });
     } else {
       await bot.sendMessage(chatId, "❌ Tasodifiy kino topilmadi.");
     }
@@ -1078,7 +1079,8 @@ async function handleRegularMessage(msg) {
     // Try to find movie by code
     const movieData = await RedisDB.getMovie(text);
     if (movieData) {
-      await bot.sendMessage(chatId, movieData, { parse_mode: "HTML" });
+      const movieText = formatMovieText(movieData);
+      await bot.sendMessage(chatId, movieText, { parse_mode: "HTML" });
       console.log(`Movie found and sent to user ${userId}: ${text}`);
     } else {
       await bot.sendMessage(chatId, "❌ Bunday kodli kino topilmadi.");
@@ -1177,10 +1179,7 @@ async function handleChatMember(chatMember) {
 const cancel = createKeyboard([[{ text: "◀️ Orqaga" }]]);
 const removeKey = { remove_keyboard: true };
 
-// Bot event handlers - Global handlers (faqat bir marta o'rnatiladi)
-let handlersSetup = false;
-
-async function setupBotHandlers() {
+// Admin komandalarini ishlov berish
   try {
     if (handlersSetup) {
       console.log("Bot handlers already setup, skipping...");
@@ -1401,7 +1400,7 @@ async function setupBotHandlers() {
                 },
               ],
               [{ text: "🎲 Yana tasodifiy", callback_data: "random_movie" }],
-            ],
+            },
           };
 
           await bot.sendVideo(chatId, movie.file_id, {
@@ -1582,7 +1581,7 @@ async function setupBotHandlers() {
                       callback_data: "random_movie",
                     },
                   ],
-                ],
+                },
               };
 
               await bot.editMessageMedia(
@@ -1936,6 +1935,56 @@ async function handleStepBasedCommands(msg, user) {
     }
   } catch (error) {
     console.error("Step-based komandalar xatolik:", error);
+  }
+}
+
+// Helper function to format movie data as text
+function formatMovieText(movieData) {
+  if (!movieData) return "❌ Kino ma'lumotlari topilmadi.";
+
+  try {
+    let text = "";
+
+    if (movieData.name) {
+      text += `🎬 <b>${movieData.name}</b>\n`;
+    }
+
+    if (movieData.year) {
+      text += `📅 Yil: ${movieData.year}\n`;
+    }
+
+    if (movieData.genre) {
+      text += `🎭 Janr: ${movieData.genre}\n`;
+    }
+
+    if (movieData.rating) {
+      text += `⭐ Reyting: ${movieData.rating}\n`;
+    }
+
+    if (movieData.quality) {
+      text += `🔮 Sifat: ${movieData.quality}\n`;
+    }
+
+    if (movieData.language) {
+      text += `🗣 Til: ${movieData.language}\n`;
+    }
+
+    if (movieData.subtitle) {
+      text += `📝 Subtitle: ${movieData.subtitle}\n`;
+    }
+
+    if (movieData.description) {
+      text += `\n📖 Tavsif: ${movieData.description}\n`;
+    }
+
+    if (movieData.id) {
+      text += `\n🆔 Kod: ${movieData.id}`;
+    }
+
+    return text || "❌ Kino ma'lumotlari to'liq emas.";
+  } catch (error) {
+    console.error("Movie formatting error:", error);
+    return "❌ Kino ma'lumotlarini formatlashda xatolik.";
   }
 }
 
