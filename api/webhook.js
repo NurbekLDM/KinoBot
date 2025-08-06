@@ -26,7 +26,7 @@ const adminUsername = process.env.ADMIN_USERNAME || "Nurbek_2255";
 let redisClient;
 let isRedisConnected = false;
 
-// Redis ulanishi
+// Redis ulanishi - Fixed version
 async function initRedis() {
   if (redisClient && isRedisConnected && redisClient.isOpen) {
     return redisClient;
@@ -35,20 +35,46 @@ async function initRedis() {
   try {
     console.log("Redis ulanish...");
     
-    redisClient = redis.createClient({
+    // Redis konfiguratsiyasi - SSL/TLS ni to'g'ri sozlash
+    const redisConfig = {
       socket: {
         host: process.env.REDIS_HOST,
         port: parseInt(process.env.REDIS_PORT) || 6379,
         reconnectDelay: 5000,
         connectTimeout: 15000,
-        tls: process.env.REDIS_TLS === "true" // TLS ni environment variable orqali sozlash
+        // TLS ni faqat kerak bo'lganda yoqish
+        ...(process.env.REDIS_TLS === "true" && {
+          tls: {
+            rejectUnauthorized: false, // Self-signed sertifikatlar uchun
+            // Agar kerak bo'lsa qo'shimcha TLS sozlamalar
+          }
+        })
       },
       password: process.env.REDIS_PASSWORD,
-    });
+      // Connection retry strategiyasi
+      retry: {
+        retries: 3,
+        delay: (attempt) => Math.min(attempt * 50, 500)
+      }
+    };
+
+    // Agar TLS kerak bo'lmasa, uni umuman qo'shmaslik
+    if (process.env.REDIS_TLS !== "true") {
+      // HTTP Redis connection uchun
+      delete redisConfig.socket.tls;
+    }
+
+    redisClient = redis.createClient(redisConfig);
 
     redisClient.on("error", (err) => {
       console.error("Redis xatolik:", err);
       isRedisConnected = false;
+      
+      // Agar SSL xatolik bo'lsa, TLS ni o'chirish
+      if (err.code === 'ERR_SSL_PACKET_LENGTH_TOO_LONG') {
+        console.log("SSL xatolik aniqlandi, TLS ni o'chirish...");
+        process.env.REDIS_TLS = "false";
+      }
     });
 
     redisClient.on("connect", () => {
@@ -65,15 +91,30 @@ async function initRedis() {
       isRedisConnected = false;
     });
 
-    await redisClient.connect();
+    // Timeout bilan ulanish
+    const connectPromise = redisClient.connect();
+    const timeoutPromise = new Promise((_, reject) => 
+      setTimeout(() => reject(new Error('Redis connection timeout')), 20000)
+    );
+    
+    await Promise.race([connectPromise, timeoutPromise]);
     isRedisConnected = true;
     console.log("Redis muvaffaqiyatli ulandi!");
     
     await initDefaultData();
     return redisClient;
+    
   } catch (error) {
     console.error("Redis ulanishida xatolik:", error);
     isRedisConnected = false;
+    
+    // Agar SSL xatolik bo'lsa, TLS ni o'chirib qayta urinish
+    if (error.code === 'ERR_SSL_PACKET_LENGTH_TOO_LONG' && process.env.REDIS_TLS === "true") {
+      console.log("SSL xatolik tufayli TLS ni o'chirib qayta urinish...");
+      process.env.REDIS_TLS = "false";
+      return await initRedis(); // Recursive call
+    }
+    
     throw error;
   }
 }
