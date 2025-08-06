@@ -1200,6 +1200,7 @@ export default async function handler(req, res) {
       await bot.processUpdate(update);
       res.status(200).json({ ok: true });
     } else if (req.method === "GET") {
+      // Health check
       res.status(200).json({ 
         status: "Bot is running",
         timestamp: new Date().toISOString()

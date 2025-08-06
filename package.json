@@ -6,7 +6,7 @@
   "type": "module",
   "scripts": {
     "dev": "vercel dev",
-    "build": "echo 'No build step required'",
+    "build": "echo 'Build completed successfully'",
     "start": "node api/webhook.js"
   },
   "dependencies": {

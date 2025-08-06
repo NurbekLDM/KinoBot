@@ -11,6 +11,10 @@
       "dest": "/api/webhook.js"
     },
     {
+      "src": "/",
+      "dest": "/public/index.html"
+    },
+    {
       "src": "/(.*)",
       "dest": "/api/webhook.js"
     }
