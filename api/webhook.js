@@ -8,13 +8,12 @@ dotenv.config();
 
 // Telegram Bot konfiguratsiyasi
 const API_KEY = process.env.BOT_TOKEN;
-const WEBHOOK_URL =
-  process.env.WEBHOOK_URL || "https://your-vercel-app.vercel.app";
+const WEBHOOK_URL = process.env.WEBHOOK_URL || "https://your-vercel-app.vercel.app";
 
 // Bot ni webhook rejimida ishga tushirish (polling: false!)
-const bot = new TelegramBot(API_KEY, {
+const bot = new TelegramBot(API_KEY, { 
   polling: false,
-  webHook: false,
+  webHook: false
 });
 
 // Bot ma'lumotlari
@@ -35,7 +34,7 @@ async function initRedis() {
 
   try {
     console.log("Redis ulanish...");
-
+    
     // Redis konfiguratsiyasi - SSL/TLS ni to'g'ri sozlash
     const redisConfig = {
       socket: {
@@ -48,15 +47,15 @@ async function initRedis() {
           tls: {
             rejectUnauthorized: false, // Self-signed sertifikatlar uchun
             // Agar kerak bo'lsa qo'shimcha TLS sozlamalar
-          },
-        }),
+          }
+        })
       },
       password: process.env.REDIS_PASSWORD,
       // Connection retry strategiyasi
       retry: {
         retries: 3,
-        delay: (attempt) => Math.min(attempt * 50, 500),
-      },
+        delay: (attempt) => Math.min(attempt * 50, 500)
+      }
     };
 
     // Agar TLS kerak bo'lmasa, uni umuman qo'shmaslik
@@ -70,9 +69,9 @@ async function initRedis() {
     redisClient.on("error", (err) => {
       console.error("Redis xatolik:", err);
       isRedisConnected = false;
-
+      
       // Agar SSL xatolik bo'lsa, TLS ni o'chirish
-      if (err.code === "ERR_SSL_PACKET_LENGTH_TOO_LONG") {
+      if (err.code === 'ERR_SSL_PACKET_LENGTH_TOO_LONG') {
         console.log("SSL xatolik aniqlandi, TLS ni o'chirish...");
         process.env.REDIS_TLS = "false";
       }
@@ -94,33 +93,30 @@ async function initRedis() {
 
     // Timeout bilan ulanish
     const connectPromise = redisClient.connect();
-    const timeoutPromise = new Promise((_, reject) =>
-      setTimeout(() => reject(new Error("Redis connection timeout")), 20000)
+    const timeoutPromise = new Promise((_, reject) => 
+      setTimeout(() => reject(new Error('Redis connection timeout')), 20000)
     );
-
+    
     await Promise.race([connectPromise, timeoutPromise]);
     isRedisConnected = true;
     console.log("Redis muvaffaqiyatli ulandi!");
-
+    
     await initDefaultData();
     return redisClient;
   } catch (error) {
     console.error("Redis ulanishida xatolik:", error);
     isRedisConnected = false;
-
+    
     // Agar SSL xatolik bo'lsa, TLS ni o'chirib qayta urinish
-    if (
-      error.code === "ERR_SSL_PACKET_LENGTH_TOO_LONG" &&
-      process.env.REDIS_TLS === "true"
-    ) {
+    if (error.code === 'ERR_SSL_PACKET_LENGTH_TOO_LONG' && process.env.REDIS_TLS === "true") {
       console.log("SSL xatolik tufayli TLS ni o'chirib qayta urinish...");
       process.env.REDIS_TLS = "false";
       return await initRedis(); // Recursive call
     }
-
+    
     throw error;
   }
-}
+} 
 
 // Default ma'lumotlarni o'rnatish
 async function initDefaultData() {
@@ -133,8 +129,7 @@ async function initDefaultData() {
         kino: "0",
         kino2: "0",
         movie_channel: "",
-        ads_text:
-          "🎬 Kinolarni bepul tomosha qiling!\n\n📢 Kanalimiz: %kino%\n👨‍💼 Admin: @%admin%",
+        ads_text: "🎬 Kinolarni bepul tomosha qiling!\n\n📢 Kanalimiz: %kino%\n👨‍💼 Admin: @%admin%",
       });
     }
 
@@ -265,13 +260,8 @@ class RedisDB {
       if (exists) {
         await redisClient.del(`movie:${movieId}`);
         await redisClient.sRem("movies:all", movieId);
-        const deletedCount =
-          (await redisClient.hGet("settings", "kino2")) || "0";
-        await redisClient.hSet(
-          "settings",
-          "kino2",
-          (Number.parseInt(deletedCount) + 1).toString()
-        );
+        const deletedCount = (await redisClient.hGet("settings", "kino2")) || "0";
+        await redisClient.hSet("settings", "kino2", (Number.parseInt(deletedCount) + 1).toString());
         return true;
       }
       return false;
@@ -292,9 +282,7 @@ class RedisDB {
           movies.push(movieData);
         }
       }
-      return movies.sort(
-        (a, b) => Number.parseInt(a.id) - Number.parseInt(b.id)
-      );
+      return movies.sort((a, b) => Number.parseInt(a.id) - Number.parseInt(b.id));
     } catch (error) {
       console.error("Barcha kinolarni olishda xatolik:", error);
       return [];
@@ -362,13 +350,9 @@ class RedisDB {
 
   static async getAdsText() {
     try {
-      if (!this.checkRedisClient())
-        return "🎬 Kinolarni bepul tomosha qiling!\n\n📢 Kanalimiz: %kino%\n👨‍💼 Admin: @%admin%";
+      if (!this.checkRedisClient()) return "🎬 Kinolarni bepul tomosha qiling!\n\n📢 Kanalimiz: %kino%\n👨‍💼 Admin: @%admin%";
       const adsText = await redisClient.hGet("settings", "ads_text");
-      return (
-        adsText ||
-        "🎬 Kinolarni bepul tomosha qiling!\n\n📢 Kanalimiz: %kino%\n👨‍💼 Admin: @%admin%"
-      );
+      return adsText || "🎬 Kinolarni bepul tomosha qiling!\n\n📢 Kanalimiz: %kino%\n👨‍💼 Admin: @%admin%";
     } catch (error) {
       console.error("Reklama matnini olishda xatolik:", error);
       return "🎬 Kinolarni bepul tomosha qiling!\n\n📢 Kanalimiz: %kino%\n👨‍💼 Admin: @%admin%";
@@ -408,11 +392,7 @@ class RedisDB {
       if (!this.checkRedisClient()) return;
       await redisClient.sAdd("channels:mandatory", channelId.toString());
       if (channelUrl) {
-        await redisClient.hSet(
-          "channels:urls",
-          channelId.toString(),
-          channelUrl
-        );
+        await redisClient.hSet("channels:urls", channelId.toString(), channelUrl);
       }
       console.log(`Majburiy kanal qo'shildi: ${channelId}, URL: ${channelUrl}`);
     } catch (error) {
@@ -456,10 +436,7 @@ class RedisDB {
   static async addChannelRequest(channelId, userId) {
     try {
       if (!this.checkRedisClient()) return;
-      await redisClient.sAdd(
-        `channel:requests:${channelId}`,
-        userId.toString()
-      );
+      await redisClient.sAdd(`channel:requests:${channelId}`, userId.toString());
     } catch (error) {
       console.error("Kanal so'rovini qo'shishda xatolik:", error);
     }
@@ -468,10 +445,7 @@ class RedisDB {
   static async isUserRequested(channelId, userId) {
     try {
       if (!this.checkRedisClient()) return false;
-      return await redisClient.sIsMember(
-        `channel:requests:${channelId}`,
-        userId.toString()
-      );
+      return await redisClient.sIsMember(`channel:requests:${channelId}`, userId.toString());
     } catch (error) {
       return false;
     }
@@ -482,11 +456,7 @@ class RedisDB {
       if (!this.checkRedisClient()) return;
       await redisClient.sAdd("channels:join_request", channelId.toString());
       if (channelUrl) {
-        await redisClient.hSet(
-          "channels:join_urls",
-          channelId.toString(),
-          channelUrl
-        );
+        await redisClient.hSet("channels:join_urls", channelId.toString(), channelUrl);
       }
       console.log(`Zayavka kanali qo'shildi: ${channelId}, URL: ${channelUrl}`);
     } catch (error) {
@@ -544,6 +514,16 @@ class RedisDB {
       console.error("Matnni o'rnatishda xatolik:", error);
     }
   }
+
+  static async getUserCount() {
+    try {
+      if (!this.checkRedisClient()) return 0;
+      return await redisClient.sCard("users:all");
+    } catch (error) {
+      console.error("Foydalanuvchilar sonini olishda xatolik:", error);
+      return 0;
+    }
+  }
 }
 
 // Foydalanuvchi ismini olish
@@ -559,66 +539,38 @@ async function getName(id) {
 // Majburiy obuna tekshirish - xatoliklarni boshqarish bilan
 async function joinchat(userId) {
   try {
-    console.log(`Checking channel membership for user ${userId}`);
-
     const mandatoryChannels = await RedisDB.getMandatoryChannels();
     const joinRequestChannels = await RedisDB.getJoinRequestChannels();
-
-    console.log(`Mandatory channels:`, mandatoryChannels);
-    console.log(`Join request channels:`, joinRequestChannels);
-
     const allChannels = [...mandatoryChannels, ...joinRequestChannels];
 
-    if (allChannels.length === 0) {
-      console.log(`No channels to check for user ${userId}`);
-      return true;
-    }
+    if (allChannels.length === 0) return true;
 
     let uns = false;
     const inlineKeyboard = [];
 
-    // Majburiy kanallarni tekshirish
     for (const channelId of mandatoryChannels) {
       try {
-        console.log(
-          `Checking mandatory channel ${channelId} for user ${userId}`
-        );
-
         const url = await RedisDB.getChannelUrl(channelId);
-
+        
+        // Retry mexanizmi
         let chat, chatMember;
-        let retries = 2;
-
+        let retries = 3;
+        
         while (retries > 0) {
           try {
             chat = await bot.getChat(channelId);
             chatMember = await bot.getChatMember(channelId, userId);
             break;
           } catch (error) {
-            console.log(
-              `Channel check error for ${channelId} (retries left: ${
-                retries - 1
-              }):`,
-              error.message
-            );
+            console.log(`Kanal tekshirishda xatolik (qolgan urinish: ${retries-1}):`, error.message);
             retries--;
-            if (retries === 0) {
-              console.log(
-                `Skipping channel ${channelId} due to persistent errors`
-              );
-              throw error;
-            }
-            await new Promise((resolve) => setTimeout(resolve, 500));
+            if (retries === 0) throw error;
+            // 1 sekund kutish
+            await new Promise(resolve => setTimeout(resolve, 1000));
           }
         }
-
-        if (!chat || !chatMember) {
-          console.log(`Could not get data for channel ${channelId}, skipping`);
-          continue;
-        }
-
+        
         let status = chatMember.status;
-        console.log(`User ${userId} status in channel ${channelId}: ${status}`);
 
         if (status === "left") {
           const isRequested = await RedisDB.isUserRequested(channelId, userId);
@@ -642,60 +594,41 @@ async function joinchat(userId) {
             },
           ]);
           uns = true;
-          console.log(`User ${userId} is not a member of channel ${channelId}`);
         }
       } catch (error) {
-        console.error(`Error checking mandatory channel ${channelId}:`, error);
-        continue;
+        console.error(`Majburiy kanal tekshirishda xatolik (${channelId}):`, error.message);
+        // Kanal mavjud bo'lmasa, uni e'tiborsiz qoldirish
+        if (error.code === 'ETELEGRAM' && error.response?.body?.description?.includes('not found')) {
+          console.log(`Kanal topilmadi: ${channelId}`);
+          continue;
+        }
+        uns = true;
       }
     }
 
-    // Zayavka kanallarni tekshirish
     for (const channelId of joinRequestChannels) {
       try {
-        console.log(
-          `Checking join request channel ${channelId} for user ${userId}`
-        );
-
         const url = await RedisDB.getJoinRequestChannelUrl(channelId);
-
+        
+        // Retry mexanizmi
         let chat, chatMember;
-        let retries = 2;
-
+        let retries = 3;
+        
         while (retries > 0) {
           try {
             chat = await bot.getChat(channelId);
             chatMember = await bot.getChatMember(channelId, userId);
             break;
           } catch (error) {
-            console.log(
-              `Join channel check error for ${channelId} (retries left: ${
-                retries - 1
-              }):`,
-              error.message
-            );
+            console.log(`Zayavka kanal tekshirishda xatolik (qolgan urinish: ${retries-1}):`, error.message);
             retries--;
-            if (retries === 0) {
-              console.log(
-                `Skipping join request channel ${channelId} due to persistent errors`
-              );
-              throw error;
-            }
-            await new Promise((resolve) => setTimeout(resolve, 500));
+            if (retries === 0) throw error;
+            // 1 sekund kutish
+            await new Promise(resolve => setTimeout(resolve, 1000));
           }
         }
-
-        if (!chat || !chatMember) {
-          console.log(
-            `Could not get data for join request channel ${channelId}, skipping`
-          );
-          continue;
-        }
-
+        
         let status = chatMember.status;
-        console.log(
-          `User ${userId} status in join request channel ${channelId}: ${status}`
-        );
 
         if (status === "left") {
           const isRequested = await RedisDB.isUserRequested(channelId, userId);
@@ -719,24 +652,19 @@ async function joinchat(userId) {
             },
           ]);
           uns = true;
-          console.log(
-            `User ${userId} needs to send join request to channel ${channelId}`
-          );
         }
       } catch (error) {
-        console.error(
-          `Error checking join request channel ${channelId}:`,
-          error
-        );
-        continue;
+        console.error(`Zayavka kanal tekshirishda xatolik (${channelId}):`, error.message);
+        // Kanal mavjud bo'lmasa, uni e'tiborsiz qoldirish
+        if (error.code === 'ETELEGRAM' && error.response?.body?.description?.includes('not found')) {
+          console.log(`Zayavka kanali topilmadi: ${channelId}`);
+          continue;
+        }
+        uns = true;
       }
     }
 
     if (uns) {
-      console.log(
-        `User ${userId} failed channel membership check, sending subscription message`
-      );
-
       inlineKeyboard.push([
         {
           text: "✅ Tekshirish",
@@ -753,25 +681,16 @@ async function joinchat(userId) {
             reply_markup: { inline_keyboard: inlineKeyboard },
           }
         );
-        console.log(`Subscription message sent to user ${userId}`);
       } catch (error) {
-        console.error(
-          `Error sending subscription message to user ${userId}:`,
-          error
-        );
+        console.error("Kanal obuna xabarini yuborishda xatolik:", error);
       }
       return false;
     }
 
-    console.log(`User ${userId} passed all channel checks`);
     return true;
   } catch (error) {
-    console.error(
-      `General error in joinchat function for user ${userId}:`,
-      error
-    );
-    console.log(`Returning true to allow bot to continue for user ${userId}`);
-    return true;
+    console.error("Joinchat funksiyasida umumiy xatolik:", error);
+    return true; // Xatolik bo'lsa ham botni ishlashga ruxsat berish
   }
 }
 
@@ -792,6 +711,650 @@ const panel = createKeyboard([
   [{ text: "✍️ Post xabar" }, { text: "📬 Forward xabar" }],
   [{ text: "⬇️ Panelni Yopish" }],
 ]);
+
+const cancel = createKeyboard([[{ text: "◀️ Orqaga" }]]);
+const removeKey = { remove_keyboard: true };
+
+
+    // /start komandasi
+    bot.onText(/\/start/, async (msg) => {
+      const chatId = msg.chat.id;
+      const userId = msg.from.id;
+      const name = msg.from.first_name;
+
+      console.log(`Start command received from user ${userId}`);
+
+      if (msg.chat.type !== "private") return;
+
+      let user = await RedisDB.getUser(userId);
+      if (user && user.ban === "1") return;
+
+      if (!user) {
+        user = await RedisDB.createUser(userId);
+      } else {
+        await RedisDB.updateUser(userId, { lastmsg: "start", step: "0" });
+      }
+
+      if (!(await joinchat(userId))) return;
+
+      try {
+        const kino_id = await RedisDB.getMovieChannel();
+        let kino = "";
+        let kinoUrl = "";
+
+        if (kino_id) {
+          try {
+            const chat = await bot.getChat(kino_id);
+            if (chat.username) {
+              kino = chat.username;
+              kinoUrl = `https://t.me/${kino}`;
+            } else {
+              kino = chat.title || "Kino Kanali";
+              kinoUrl = `https://t.me/c/${Math.abs(kino_id).toString().slice(4)}`;
+            }
+          } catch (error) {
+            console.error("Kino kanal ma'lumotlarini olishda xatolik:", error);
+            kino = "";
+            kinoUrl = "";
+          }
+        }
+
+        const startTextBase64 = await RedisDB.getText("start");
+        const startText = startTextBase64
+          ? Buffer.from(startTextBase64, "base64").toString()
+          : "👋 Assalomu alaykum {name}  botimizga xush kelibsiz.\n\n✅🎭 Kino kodini yuboring.";
+        const currentTime = moment().format("DD.MM.YYYY | HH:mm");
+        const message = startText
+          .replace("{name}", `<a href="tg://user?id=${userId}">${name}</a>`)
+          .replace("{time}", currentTime);
+
+        const keyboard = {
+          inline_keyboard: [
+            [
+              {
+                text: "🔎 Kodlarni qidirish",
+                url: kinoUrl || `https://t.me/durov`,
+              },
+            ],
+            [
+              {
+                text: "🎲 Tasodifiy kino",
+                callback_data: "random_movie",
+              },
+            ],
+          ],
+        };
+
+        await bot.sendMessage(chatId, message, {
+          parse_mode: "HTML",
+          reply_markup: keyboard,
+        });
+
+        console.log(`Start message sent to user ${userId}`);
+      } catch (error) {
+        console.error("/start komandasi xatolik:", error);
+        
+        // Fallback message
+        try {
+          await bot.sendMessage(chatId, "👋 Assalomu alaykum! Botga xush kelibsiz.\n\n🎬 Kino kodini yuboring:");
+        } catch (fallbackError) {
+          console.error("Fallback message ham yuborilmadi:", fallbackError);
+        }
+      }
+    });
+
+    // /rand komandasi
+    bot.onText(/\/rand/, async (msg) => {
+      const chatId = msg.chat.id;
+      const userId = msg.from.id;
+
+      if (msg.chat.type !== "private") return;
+
+      const user = await RedisDB.getUser(userId);
+      if (user && user.ban === "1") return;
+
+      if (!(await joinchat(userId))) return;
+
+      try {
+        const movieCount = await RedisDB.getMovieCount();
+        if (movieCount === 0) {
+          await bot.sendMessage(chatId, "<b>📛 Hozircha kinolar mavjud emas!</b>", {
+            parse_mode: "HTML",
+          });
+          return;
+        }
+
+        const randomId = Math.floor(Math.random() * movieCount) + 1;
+        const movie = await RedisDB.getMovie(randomId.toString());
+
+        if (movie) {
+          const filmName = Buffer.from(movie.film_name, "base64").toString();
+          const reklama = await RedisDB.getAdsText();
+          const bot_username = (await bot.getMe()).username;
+          const kino_id = await RedisDB.getMovieChannel();
+          let kino = "";
+          let kinoUrl = "";
+
+          if (kino_id) {
+            try {
+              const chat = await bot.getChat(kino_id);
+              if (chat.username) {
+                kino = chat.username;
+                kinoUrl = `https://t.me/${kino}`;
+              } else {
+                kino = chat.title || "Kino Kanali";
+                kinoUrl = `https://t.me/c/${Math.abs(kino_id).toString().slice(4)}`;
+              }
+            } catch (error) {
+              console.error("Kino kanal ma'lumotlarini olishda xatolik:", error);
+              kino = "";
+              kinoUrl = "";
+            }
+          }
+
+          const reklamaText = reklama
+            .replace("%kino%", kino)
+            .replace("%admin%", adminUsername);
+
+          const keyboard = {
+            inline_keyboard: [
+              [
+                {
+                  text: "↗️ Do'stlarga ulashish",
+                  url: `https://t.me/share/url/?url=https://t.me/${bot_username}?start=${randomId}`,
+                },
+              ],
+              [{ text: "🔎 Boshqa kodlar", url: kinoUrl || `https://t.me/durov` }],
+              [{ text: "🎲 Yana tasodifiy", callback_data: "random_movie" }]
+            ],
+          };
+
+          await bot.sendVideo(chatId, movie.file_id, {
+            caption: `<b>🎲 Tasodifiy film: ${filmName}</b>\n<b>🆔 Kod: ${randomId}</b>\n\n${reklamaText}`,
+            parse_mode: "HTML",
+            reply_markup: keyboard,
+          });
+        } else {
+          await bot.sendMessage(chatId, "<b>📛 Tasodifiy kino topilmadi!</b>", {
+            parse_mode: "HTML",
+          });
+        }
+      } catch (error) {
+        console.error("Tasodifiy kino olishda xatolik:", error);
+        await bot.sendMessage(chatId, "⚠️ Tasodifiy kino olishda xatolik yuz berdi!");
+      }
+    });
+
+    // Admin paneli
+    bot.onText(/\/(panel|a|admin|p)$/, async (msg) => {
+      const chatId = msg.chat.id;
+      const userId = msg.from.id;
+      const admins = await RedisDB.getAdmins();
+
+      if (!admins.includes(userId)) return;
+
+      await bot.sendMessage(
+        chatId,
+        "<b>👨🏻‍💻 Boshqaruv paneliga xush kelibsiz.</b>\n\n<i>Nimani o'zgartiramiz?</i>",
+        {
+          parse_mode: "HTML",
+          reply_markup: panel,
+        }
+      );
+      await RedisDB.updateUser(userId, { lastmsg: "panel", step: "0" });
+    });
+
+    // Callback query ishlovchisi
+    bot.on("callback_query", async (query) => {
+      const chatId = query.message.chat.id;
+      const userId = query.from.id;
+      const data = query.data;
+      const messageId = query.message.message_id;
+
+      try {
+        if (data === "check") {
+          await bot.deleteMessage(chatId, messageId).catch(() => {});
+          if (await joinchat(userId)) {
+            // Start message logic here
+            const kino_id = await RedisDB.getMovieChannel();
+            let kinoUrl = "";
+
+            if (kino_id) {
+              try {
+                const chat = await bot.getChat(kino_id);
+                if (chat.username) {
+                  kinoUrl = `https://t.me/${chat.username}`;
+                } else {
+                  kinoUrl = `https://t.me/c/${Math.abs(kino_id).toString().slice(4)}`;
+                }
+              } catch (error) {
+                console.error("Kino kanal ma'lumotlarini olishda xatolik:", error);
+                kinoUrl = "";
+              }
+            }
+
+            const startTextBase64 = await RedisDB.getText("start");
+            const startText = startTextBase64
+              ? Buffer.from(startTextBase64, "base64").toString()
+              : "👋 Assalomu alaykum {name}  botimizga xush kelibsiz.\n\n✅🎭 Kino kodini yuboring.";
+            const currentTime = moment().format("DD.MM.YYYY | HH:mm");
+            const name = query.from.first_name;
+            const message = startText
+              .replace("{name}", `<a href="tg://user?id=${userId}">${name}</a>`)
+              .replace("{time}", currentTime);
+
+            const keyboard = {
+              inline_keyboard: [
+                [
+                  {
+                    text: "🔎 Kodlarni qidirish",
+                    url: kinoUrl || `https://t.me/durov`,
+                  },
+                ],
+                [
+                  {
+                    text: "🎲 Tasodifiy kino",
+                    callback_data: "random_movie",
+                  },
+                ],
+              ],
+            };
+
+            await bot.sendMessage(chatId, message, {
+              parse_mode: "HTML",
+              reply_markup: keyboard,
+            });
+            await RedisDB.updateUser(userId, { lastmsg: "start", step: "0" });
+          }
+        }
+
+        // Tasodifiy kino callback
+        if (data === "random_movie") {
+          try {
+            const movieCount = await RedisDB.getMovieCount();
+            if (movieCount === 0) {
+              await bot.answerCallbackQuery(query.id, {
+                text: "Kinolar mavjud emas!",
+              });
+              return;
+            }
+
+            const randomId = Math.floor(Math.random() * movieCount) + 1;
+            const movie = await RedisDB.getMovie(randomId.toString());
+
+            if (movie) {
+              const filmName = Buffer.from(movie.film_name, "base64").toString();
+              const reklama = await RedisDB.getAdsText();
+              const bot_username = (await bot.getMe()).username;
+              const kino_id = await RedisDB.getMovieChannel();
+              let kino = "";
+              let kinoUrl = "";
+
+              if (kino_id) {
+                try {
+                  const chat = await bot.getChat(kino_id);
+                  if (chat.username) {
+                    kino = chat.username;
+                    kinoUrl = `https://t.me/${kino}`;
+                  } else {
+                    kino = chat.title || "Kino Kanali";
+                    kinoUrl = `https://t.me/c/${Math.abs(kino_id).toString().slice(4)}`;
+                  }
+                } catch (error) {
+                  console.error("Kino kanal ma'lumotlarini olishda xatolik:", error);
+                  kino = "";
+                  kinoUrl = "";
+                }
+              }
+
+              const reklamaText = reklama
+                .replace("%kino%", kino)
+                .replace("%admin%", adminUsername);
+
+              const keyboard = {
+                inline_keyboard: [
+                  [
+                    {
+                      text: "↗️ Do'stlarga ulashish",
+                      url: `https://t.me/share/url/?url=https://t.me/${bot_username}?start=${randomId}`,
+                    },
+                  ],
+                  [
+                    {
+                      text: "🔎 Boshqa kodlar",
+                      url: kinoUrl || `https://t.me/durov`,
+                    },
+                  ],
+                  [{ text: "🎲 Yana tasodifiy", callback_data: "random_movie" }],
+                ],
+              };
+
+              await bot.editMessageMedia(
+                {
+                  type: "video",
+                  media: movie.file_id,
+                  caption: `<b>🎲 Tasodifiy film: ${filmName}</b>\n<b>🆔 Kod: ${randomId}</b>\n\n${reklamaText}`,
+                  parse_mode: "HTML",
+                },
+                {
+                  chat_id: chatId,
+                  message_id: messageId,
+                  reply_markup: keyboard,
+                }
+              );
+
+              await bot.answerCallbackQuery(query.id, {
+                text: `🎲 Yangi tasodifiy film: ${filmName}`,
+              });
+            } else {
+              await bot.answerCallbackQuery(query.id, {
+                text: "Tasodifiy kino topilmadi!",
+              });
+            }
+          } catch (error) {
+            console.error("Tasodifiy kino callback xatolik:", error);
+            await bot.answerCallbackQuery(query.id, { text: "Xatolik yuz berdi!" });
+          }
+        }
+
+        await bot.answerCallbackQuery(query.id);
+      } catch (error) {
+        console.error("Callback query ishlov berish xatolik:", error);
+        await bot.answerCallbackQuery(query.id, { text: "Xatolik yuz berdi!" }).catch(() => {});
+      }
+    });
+
+    // Xabar ishlovchisi
+    bot.on("message", async (msg) => {
+      if (msg.text && msg.text.startsWith("/")) return;
+
+      const chatId = msg.chat.id;
+      const userId = msg.from.id;
+      const text = msg.text;
+
+      console.log(`Message received from user ${userId}: ${text}`);
+
+      if (msg.chat.type !== "private") return;
+
+      const user = await RedisDB.getUser(userId);
+      if (user && user.ban === "1") return;
+
+      if (!user) {
+        await RedisDB.createUser(userId);
+      }
+
+      const admins = await RedisDB.getAdmins();
+      const isAdmin = admins.includes(userId);
+
+      // Kino kodi qidirish
+      if (user && user.lastmsg === "start" && text && !text.startsWith("/")) {
+        let searchCode = text;
+        if (text.startsWith("/start ")) {
+          searchCode = text.split(" ")[1];
+        }
+
+        if (text === "/rand") {
+          const movieCount = await RedisDB.getMovieCount();
+          if (movieCount > 0) {
+            searchCode = Math.floor(Math.random() * movieCount) + 1;
+          }
+        }
+
+        if (!(await joinchat(userId))) return;
+
+        if (!isNaN(searchCode)) {
+          try {
+            const movie = await RedisDB.getMovie(searchCode);
+            if (movie) {
+              const filmName = Buffer.from(movie.film_name, "base64").toString();
+              const reklama = await RedisDB.getAdsText();
+              const bot_username = (await bot.getMe()).username;
+              const kino_id = await RedisDB.getMovieChannel();
+              let kino = "";
+              let kinoUrl = "";
+
+              if (kino_id) {
+                try {
+                  const chat = await bot.getChat(kino_id);
+                  if (chat.username) {
+                    kino = chat.username;
+                    kinoUrl = `https://t.me/${kino}`;
+                  } else {
+                    kino = chat.title || "Kino Kanali";
+                    kinoUrl = `https://t.me/c/${Math.abs(kino_id).toString().slice(4)}`;
+                  }
+                } catch (error) {
+                  console.error("Kino kanal ma'lumotlarini olishda xatolik:", error);
+                  kino = "";
+                  kinoUrl = "";
+                }
+              }
+
+              const reklamaText = reklama
+                .replace("%kino%", kino)
+                .replace("%admin%", adminUsername);
+
+              const keyboard = {
+                inline_keyboard: [
+                  [
+                    {
+                      text: "↗️ Do'stlarga ulashish",
+                      url: `https://t.me/share/url/?url=https://t.me/${bot_username}?start=${searchCode}`,
+                    },
+                  ],
+                  [
+                    {
+                      text: "🔎 Boshqa kodlar",
+                      url: kinoUrl || `https://t.me/durov`,
+                    },
+                  ],
+                ],
+              };
+
+              await bot.sendVideo(chatId, movie.file_id, {
+                caption: `<b>${filmName}</b>\n\n${reklamaText}`,
+                parse_mode: "HTML",
+                reply_markup: keyboard,
+              });
+
+              console.log(`Movie sent to user ${userId}: ${searchCode}`);
+            } else {
+              await bot.sendMessage(
+                chatId,
+                `📛 ${searchCode} <b>kodli kino mavjud emas!</b>`,
+                {
+                  parse_mode: "HTML",
+                }
+              );
+            }
+          } catch (error) {
+            console.error("Kino qidirishda xatolik:", error);
+            await bot.sendMessage(chatId, "⚠️ Kino qidirishda xatolik yuz berdi!");
+          }
+        } else {
+          await bot.sendMessage(chatId, "<b>📛 Faqat raqamlardan foydalaning!</b>", {
+            parse_mode: "HTML",
+          });
+        }
+        return;
+      }
+
+      // Admin komandalarini ishlov berish
+      if (isAdmin) {
+        await handleAdminCommands(msg, user);
+      }
+    });
+
+    // Chat join request ishlovchisi
+    bot.on("chat_join_request", async (request) => {
+      const chatId = request.chat.id;
+      const userId = request.from.id;
+
+      try {
+        await RedisDB.addChannelRequest(chatId, userId);
+        console.log(`Join request added: ${userId} -> ${chatId}`);
+      } catch (error) {
+        console.error("Chat join request ishlov berish xatolik:", error);
+      }
+    });
+
+    // Chat member update ishlovchisi
+    bot.on("chat_member", async (update) => {
+      try {
+        if (update.new_chat_member && update.new_chat_member.status === "kicked") {
+          await RedisDB.updateUser(update.from.id, { sana: "tark" });
+        }
+      } catch (error) {
+        console.error("Chat member update ishlov berish xatolik:", error);
+      }
+    });
+
+    console.log("Bot handlers setup completed");
+  
+
+// Admin komandalarini ishlov berish
+async function handleAdminCommands(msg, user) {
+  const chatId = msg.chat.id;
+  const userId = msg.from.id;
+  const text = msg.text;
+  const step = user ? user.step : "0";
+
+  try {
+    switch (text) {
+      case "◀️ Orqaga":
+        await bot.sendMessage(
+          chatId,
+          "<b>👨🏻‍💻 Boshqaruv paneliga xush kelibsiz.</b>\n\n<i>Nimani o'zgartiramiz?</i>",
+          {
+            parse_mode: "HTML",
+            reply_markup: panel,
+          }
+        );
+        await RedisDB.updateUser(userId, { lastmsg: "panel", step: "0" });
+        break;
+
+      case "⬇️ Panelni Yopish":
+        await bot.sendMessage(
+          chatId,
+          "<b>🚪 Panelni tark etdingiz unga /panel yoki /admin xabarini yuborib kirishingiz mumkin.\n\nYangilash /start</b>",
+          {
+            parse_mode: "HTML",
+            reply_markup: removeKey,
+          }
+        );
+        await RedisDB.updateUser(userId, { lastmsg: "start", step: "0" });
+        break;
+
+      case "📊 Statistika":
+        await handleStatistics(chatId);
+        break;
+
+      case "🎬 Kino qo'shish":
+        await bot.sendMessage(chatId, "<b>🎬 Kinoni yuboring:</b>", {
+          parse_mode: "HTML",
+          reply_markup: cancel,
+        });
+        await RedisDB.updateUser(userId, { step: "movie" });
+        break;
+
+      default:
+        // Step-based ishlov berish
+        await handleStepBasedCommands(msg, user);
+    }
+  } catch (error) {
+    console.error("Admin komandalarini ishlov berish xatolik:", error);
+  }
+}
+
+// Statistika
+async function handleStatistics(chatId) {
+  try {
+    const allUsers = await RedisDB.getAllUsers();
+    const totalUsers = allUsers.length;
+    const leftUsers = allUsers.filter((user) => user.sana === "tark").length;
+    const activeUsers = totalUsers - leftUsers;
+    const movieCount = await RedisDB.getMovieCount();
+    const totalMoviesAdded = (await RedisDB.getSetting("kino")) || "0";
+    const deletedMovies = (await RedisDB.getSetting("kino2")) || "0";
+
+    const statsMessage = `💡 <b>Bot statistikasi:</b>
+
+• <b>Jami a'zolar:</b> ${totalUsers} ta
+• <b>Tark etgan a'zolar:</</b> ${leftUsers} ta
+• <b>Faol a'zolar:</b> ${activeUsers} ta
+—————————————
+• <b>Faol kinolar:</b> ${movieCount} ta
+• <b>O'chirilgan kinolar:</b> ${deletedMovies} ta
+• <b>Barcha kinolar:</b> ${totalMoviesAdded} ta`;
+
+    await bot.sendMessage(chatId, statsMessage, { parse_mode: "HTML" });
+  } catch (error) {
+    console.error("Statistika olishda xatolik:", error);
+    await bot.sendMessage(chatId, "⚠️ Statistika olishda xatolik yuz berdi!");
+  }
+}
+
+// Step-based komandalarni ishlov berish
+async function handleStepBasedCommands(msg, user) {
+  const chatId = msg.chat.id;
+  const userId = msg.from.id;
+  const text = msg.text;
+  const step = user ? user.step : "0";
+
+  try {
+    // Video yuklash
+    if (step === "movie" && msg.video) {
+      const tempId = uuidv4();
+      
+      // Redis'da temp ma'lumot saqlash
+      await redisClient.hSet(`film:${tempId}`, {
+        file_id: msg.video.file_id,
+        file_name: Buffer.from(msg.video.file_name || "video").toString("base64"),
+      });
+
+      await bot.sendMessage(chatId, "<b>🎬 Kino ma'lumotini yuboring:</b>", {
+        parse_mode: "HTML",
+        reply_markup: cancel,
+      });
+      await RedisDB.updateUser(userId, { step: "caption", temp_id: tempId });
+    }
+
+    // Caption qo'shish
+    if (step === "caption" && text && text !== "🎬 Kino qo'shish") {
+      const tempId = user.temp_id;
+      
+      // Caption ni redisga yozamiz
+      await redisClient.hSet(`film:${tempId}`, {
+        caption: Buffer.from(text).toString("base64"),
+      });
+
+      // Redisdan ma'lumotlarni o'qib olamiz
+      const filmData = await redisClient.hGetAll(`film:${tempId}`);
+      const fileId = filmData.file_id;
+      const reklama = await RedisDB.getAdsText();
+
+      const keyboard = {
+        inline_keyboard: [
+          [
+            {
+              text: "🎞️ Kanalga yuborish",
+              callback_data: `channel_${tempId}`,
+            },
+          ],
+        ],
+      };
+
+      await bot.sendVideo(chatId, fileId, {
+        caption: `<b>${text}</b>\n\n<b>${reklama}</b>`,
+        parse_mode: "HTML",
+        reply_markup: keyboard,
+      });
+      await RedisDB.updateUser(userId, { step: "0" });
+    }
+  } catch (error) {
+    console.error("Step-based komandalar xatolik:", error);
+  }
+}
 
 // Direct webhook update handler
 async function handleWebhookUpdate(update) {
@@ -1015,8 +1578,57 @@ async function handleRandCommand(msg) {
     console.log(`Random movie selected:`, randomMovie);
 
     if (randomMovie) {
-      const movieText = formatMovieText(randomMovie);
-      await bot.sendMessage(chatId, movieText, { parse_mode: "HTML" });
+      const filmName = Buffer.from(randomMovie.film_name, "base64").toString();
+      const reklama = await RedisDB.getAdsText();
+      const bot_username = (await bot.getMe()).username;
+      const kino_id = await RedisDB.getMovieChannel();
+      let kino = "";
+      let kinoUrl = "";
+
+      if (kino_id) {
+        try {
+          const chat = await bot.getChat(kino_id);
+          if (chat.username) {
+            kino = chat.username;
+            kinoUrl = `https://t.me/${kino}`;
+          } else {
+            kino = chat.title || "Kino Kanali";
+            kinoUrl = `https://t.me/c/${Math.abs(kino_id).toString().slice(4)}`;
+          }
+        } catch (error) {
+          console.error("Kino kanal ma'lumotlarini olishda xatolik:", error);
+          kino = "";
+          kinoUrl = "";
+        }
+      }
+
+      const reklamaText = reklama
+        .replace("%kino%", kino)
+        .replace("%admin%", adminUsername);
+
+      const keyboard = {
+        inline_keyboard: [
+          [
+            {
+              text: "↗️ Do'stlarga ulashish",
+              url: `https://t.me/share/url/?url=https://t.me/${bot_username}?start=${randomMovie.id}`,
+            },
+          ],
+          [
+            {
+              text: "🔎 Boshqa kodlar",
+              url: kinoUrl || `https://t.me/durov`,
+            },
+          ],
+          [{ text: "🎲 Yana tasodifiy", callback_data: "random_movie" }],
+        ],
+      };
+
+      await bot.sendVideo(chatId, randomMovie.file_id, {
+        caption: `<b>🎲 Tasodifiy film: ${filmName}</b>\n<b>🆔 Kod: ${randomMovie.id}</b>\n\n${reklamaText}`,
+        parse_mode: "HTML",
+        reply_markup: keyboard,
+      });
     } else {
       await bot.sendMessage(chatId, "❌ Tasodifiy kino topilmadi.");
     }
@@ -1033,7 +1645,7 @@ async function handleAdminPanel(msg) {
   console.log(`Admin panel request from user ${userId}`);
 
   try {
-    const admins = await RedisDB.getAdminIds();
+    const admins = await RedisDB.getAdmins();
     if (!admins.includes(userId)) {
       await bot.sendMessage(chatId, "❌ Sizda admin huquqlari yo'q.");
       return;
@@ -1079,8 +1691,56 @@ async function handleRegularMessage(msg) {
     // Try to find movie by code
     const movieData = await RedisDB.getMovie(text);
     if (movieData) {
-      const movieText = formatMovieText(movieData);
-      await bot.sendMessage(chatId, movieText, { parse_mode: "HTML" });
+      const filmName = Buffer.from(movieData.film_name, "base64").toString();
+      const reklama = await RedisDB.getAdsText();
+      const bot_username = (await bot.getMe()).username;
+      const kino_id = await RedisDB.getMovieChannel();
+      let kino = "";
+      let kinoUrl = "";
+
+      if (kino_id) {
+        try {
+          const chat = await bot.getChat(kino_id);
+          if (chat.username) {
+            kino = chat.username;
+            kinoUrl = `https://t.me/${kino}`;
+          } else {
+            kino = chat.title || "Kino Kanali";
+            kinoUrl = `https://t.me/c/${Math.abs(kino_id).toString().slice(4)}`;
+          }
+        } catch (error) {
+          console.error("Kino kanal ma'lumotlarini olishda xatolik:", error);
+          kino = "";
+          kinoUrl = "";
+        }
+      }
+
+      const reklamaText = reklama
+        .replace("%kino%", kino)
+        .replace("%admin%", adminUsername);
+
+      const keyboard = {
+        inline_keyboard: [
+          [
+            {
+              text: "↗️ Do'stlarga ulashish",
+              url: `https://t.me/share/url/?url=https://t.me/${bot_username}?start=${text}`,
+            },
+          ],
+          [
+            {
+              text: "🔎 Boshqa kodlar",
+              url: kinoUrl || `https://t.me/durov`,
+            },
+          ],
+        ],
+      };
+
+      await bot.sendVideo(chatId, movieData.file_id, {
+        caption: `<b>${filmName}</b>\n\n${reklamaText}`,
+        parse_mode: "HTML",
+        reply_markup: keyboard,
+      });
       console.log(`Movie found and sent to user ${userId}: ${text}`);
     } else {
       await bot.sendMessage(chatId, "❌ Bunday kodli kino topilmadi.");
@@ -1114,9 +1774,66 @@ async function handleCallbackQuery(query) {
       const movies = await RedisDB.getAllMovies();
       if (movies && movies.length > 0) {
         const randomMovie = movies[Math.floor(Math.random() * movies.length)];
-        const movieData = await RedisDB.getMovie(randomMovie);
-        if (movieData) {
-          await bot.sendMessage(chatId, movieData, { parse_mode: "HTML" });
+        if (randomMovie) {
+          const filmName = Buffer.from(randomMovie.film_name, "base64").toString();
+          const reklama = await RedisDB.getAdsText();
+          const bot_username = (await bot.getMe()).username;
+          const kino_id = await RedisDB.getMovieChannel();
+          let kino = "";
+          let kinoUrl = "";
+
+          if (kino_id) {
+            try {
+              const chat = await bot.getChat(kino_id);
+              if (chat.username) {
+                kino = chat.username;
+                kinoUrl = `https://t.me/${kino}`;
+              } else {
+                kino = chat.title || "Kino Kanali";
+                kinoUrl = `https://t.me/c/${Math.abs(kino_id).toString().slice(4)}`;
+              }
+            } catch (error) {
+              console.error("Kino kanal ma'lumotlarini olishda xatolik:", error);
+              kino = "";
+              kinoUrl = "";
+            }
+          }
+
+          const reklamaText = reklama
+            .replace("%kino%", kino)
+            .replace("%admin%", adminUsername);
+
+          const keyboard = {
+            inline_keyboard: [
+              [
+                {
+                  text: "↗️ Do'stlarga ulashish",
+                  url: `https://t.me/share/url/?url=https://t.me/${bot_username}?start=${randomMovie.id}`,
+                },
+              ],
+              [
+                {
+                  text: "🔎 Boshqa kodlar",
+                  url: kinoUrl || `https://t.me/durov`,
+                },
+              ],
+              [{ text: "🎲 Yana tasodifiy", callback_data: "random_movie" }],
+            ],
+          };
+
+          await bot.editMessageMedia(
+            {
+              type: "video",
+              media: randomMovie.file_id,
+              caption: `<b>🎲 Tasodifiy film: ${filmName}</b>\n<b>🆔 Kod: ${randomMovie.id}</b>\n\n${reklamaText}`,
+              parse_mode: "HTML",
+            },
+            {
+              chat_id: chatId,
+              message_id: query.message.message_id,
+              reply_markup: keyboard,
+            }
+          );
         }
       } else {
         await bot.sendMessage(chatId, "❌ Hozircha kinolar mavjud emas.");
@@ -1135,7 +1852,7 @@ async function handleAdminCallback(query, data) {
   const chatId = query.message.chat.id;
   const userId = query.from.id;
 
-  const admins = await RedisDB.getAdminIds();
+  const admins = await RedisDB.getAdmins();
   if (!admins.includes(userId)) {
     await bot.sendMessage(chatId, "❌ Sizda admin huquqlari yo'q.");
     return;
@@ -1176,814 +1893,10 @@ async function handleChatMember(chatMember) {
   // Handle member updates if needed
 }
 
-const cancel = createKeyboard([[{ text: "◀️ Orqaga" }]]);
-const removeKey = { remove_keyboard: true };
-
-// Admin komandalarini ishlov berish
-async function setupAdminHandlers(msg, user) {
-
-    // /start komandasi
-    bot.onText(/\/start/, async (msg) => {
-      const chatId = msg.chat.id;
-      const userId = msg.from.id;
-      const name = msg.from.first_name;
-
-      console.log(`START COMMAND: User ${userId} (${name}) in chat ${chatId}`);
-
-      try {
-        if (msg.chat.type !== "private") {
-          console.log(`Non-private chat type: ${msg.chat.type}`);
-          return;
-        }
-
-        let user = await RedisDB.getUser(userId);
-        console.log(`User data:`, user);
-
-        if (user && user.ban === "1") {
-          console.log(`User ${userId} is banned`);
-          return;
-        }
-
-        if (!user) {
-          console.log(`Creating new user ${userId}`);
-          user = await RedisDB.createUser(userId);
-          console.log(`User created:`, user);
-        } else {
-          console.log(`Updating existing user ${userId}`);
-          await RedisDB.updateUser(userId, { lastmsg: "start", step: "0" });
-        }
-
-        console.log(`Checking channel membership for user ${userId}`);
-        const joinResult = await joinchat(userId);
-        console.log(`Join check result:`, joinResult);
-
-        if (!joinResult) {
-          console.log(`User ${userId} failed channel check`);
-          return;
-        }
-
-        console.log(`Preparing start message for user ${userId}`);
-
-        const kino_id = await RedisDB.getMovieChannel();
-        console.log(`Movie channel ID:`, kino_id);
-
-        let kino = "";
-        let kinoUrl = "";
-
-        if (kino_id) {
-          try {
-            const chat = await bot.getChat(kino_id);
-            if (chat.username) {
-              kino = chat.username;
-              kinoUrl = `https://t.me/${kino}`;
-            } else {
-              kino = chat.title || "Kino Kanali";
-              kinoUrl = `https://t.me/c/${Math.abs(kino_id)
-                .toString()
-                .slice(4)}`;
-            }
-            console.log(`Movie channel info: ${kino}, URL: ${kinoUrl}`);
-          } catch (error) {
-            console.error("Kino kanal ma'lumotlarini olishda xatolik:", error);
-            kino = "";
-            kinoUrl = "";
-          }
-        }
-
-        const startTextBase64 = await RedisDB.getText("start");
-        console.log(`Start text base64:`, startTextBase64);
-
-        const startText = startTextBase64
-          ? Buffer.from(startTextBase64, "base64").toString()
-          : "👋 Assalomu alaykum {name}  botimizga xush kelibsiz.\n\n✅🎭 Kino kodini yuboring.";
-
-        console.log(`Start text decoded:`, startText);
-
-        const currentTime = moment().format("DD.MM.YYYY | HH:mm");
-        const message = startText
-          .replace("{name}", `<a href="tg://user?id=${userId}">${name}</a>`)
-          .replace("{time}", currentTime);
-
-        console.log(`Final message:`, message);
-
-        const keyboard = {
-          inline_keyboard: [
-            [
-              {
-                text: "🔎 Kodlarni qidirish",
-                url: kinoUrl || `https://t.me/durov`,
-              },
-            ],
-            [
-              {
-                text: "🎲 Tasodifiy kino",
-                callback_data: "random_movie",
-              },
-            ],
-          ],
-        };
-
-        console.log(`SENDING START MESSAGE to user ${userId}...`);
-
-        const result = await bot.sendMessage(chatId, message, {
-          parse_mode: "HTML",
-          reply_markup: keyboard,
-        });
-
-        console.log(
-          `START MESSAGE SENT successfully to user ${userId}:`,
-          result
-        );
-      } catch (error) {
-        console.error(`/start command error for user ${userId}:`, error);
-
-        // Fallback message
-        try {
-          console.log(`Sending fallback message to user ${userId}`);
-          const fallbackResult = await bot.sendMessage(
-            chatId,
-            "👋 Assalomu alaykum! Botga xush kelibsiz.\n\n🎬 Kino kodini yuboring:"
-          );
-          console.log(
-            `Fallback message sent to user ${userId}:`,
-            fallbackResult
-          );
-        } catch (fallbackError) {
-          console.error(
-            `Fallback message ham yuborilmadi user ${userId}:`,
-            fallbackError
-          );
-        }
-      }
-    });
-
-    // /rand komandasi
-    bot.onText(/\/rand/, async (msg) => {
-      const chatId = msg.chat.id;
-      const userId = msg.from.id;
-
-      if (msg.chat.type !== "private") return;
-
-      const user = await RedisDB.getUser(userId);
-      if (user && user.ban === "1") return;
-
-      if (!(await joinchat(userId))) return;
-
-      try {
-        const movieCount = await RedisDB.getMovieCount();
-        if (movieCount === 0) {
-          await bot.sendMessage(
-            chatId,
-            "<b>📛 Hozircha kinolar mavjud emas!</b>",
-            {
-              parse_mode: "HTML",
-            }
-          );
-          return;
-        }
-
-        const randomId = Math.floor(Math.random() * movieCount) + 1;
-        const movie = await RedisDB.getMovie(randomId.toString());
-
-        if (movie) {
-          const filmName = Buffer.from(movie.film_name, "base64").toString();
-          const reklama = await RedisDB.getAdsText();
-          const bot_username = (await bot.getMe()).username;
-          const kino_id = await RedisDB.getMovieChannel();
-          let kino = "";
-          let kinoUrl = "";
-
-          if (kino_id) {
-            try {
-              const chat = await bot.getChat(kino_id);
-              if (chat.username) {
-                kino = chat.username;
-                kinoUrl = `https://t.me/${kino}`;
-              } else {
-                kino = chat.title || "Kino Kanali";
-                kinoUrl = `https://t.me/c/${Math.abs(kino_id)
-                  .toString()
-                  .slice(4)}`;
-              }
-            } catch (error) {
-              console.error(
-                "Kino kanal ma'lumotlarini olishda xatolik:",
-                error
-              );
-              kino = "";
-              kinoUrl = "";
-            }
-          }
-
-          const reklamaText = reklama
-            .replace("%kino%", kino)
-            .replace("%admin%", adminUsername);
-
-          const keyboard = {
-            inline_keyboard: [
-              [
-                {
-                  text: "↗️ Do'stlarga ulashish",
-                  url: `https://t.me/share/url/?url=https://t.me/${bot_username}?start=${randomId}`,
-                },
-              ],
-              [
-                {
-                  text: "🔎 Boshqa kodlar",
-                  url: kinoUrl || `https://t.me/durov`,
-                },
-              ],
-              [{ text: "🎲 Yana tasodifiy", callback_data: "random_movie" }],
-            ],
-          
-          };
-
-          await bot.sendVideo(chatId, movie.file_id, {
-            caption: `<b>🎲 Tasodifiy film: ${filmName}</b>\n<b>🆔 Kod: ${randomId}</b>\n\n${reklamaText}`,
-            parse_mode: "HTML",
-            reply_markup: keyboard,
-          });
-        } else {
-          await bot.sendMessage(chatId, "<b>📛 Tasodifiy kino topilmadi!</b>", {
-            parse_mode: "HTML",
-          });
-        }
-      } catch (error) {
-        console.error("Tasodifiy kino olishda xatolik:", error);
-        await bot.sendMessage(
-          chatId,
-          "⚠️ Tasodifiy kino olishda xatolik yuz berdi!"
-        );
-      }
-    });
-
-    // Admin panel
-    bot.onText(/\/(panel|a|admin|p)$/, async (msg) => {
-      const chatId = msg.chat.id;
-      const userId = msg.from.id;
-      const admins = await RedisDB.getAdmins();
-
-      if (!admins.includes(userId)) return;
-
-      await bot.sendMessage(
-        chatId,
-        "<b>👨🏻‍💻 Boshqaruv paneliga xush kelibsiz.</b>\n\n<i>Nimani o'zgartiramiz?</i>",
-        {
-          parse_mode: "HTML",
-          reply_markup: panel,
-        }
-      );
-      await RedisDB.updateUser(userId, { lastmsg: "panel", step: "0" });
-    });
-
-    // Callback query ishlovchisi
-    bot.on("callback_query", async (query) => {
-      const chatId = query.message.chat.id;
-      const userId = query.from.id;
-      const data = query.data;
-      const messageId = query.message.message_id;
-
-      try {
-        if (data === "check") {
-          await bot.deleteMessage(chatId, messageId).catch(() => {});
-          if (await joinchat(userId)) {
-            // Start message logic here
-            const kino_id = await RedisDB.getMovieChannel();
-            let kinoUrl = "";
-
-            if (kino_id) {
-              try {
-                const chat = await bot.getChat(kino_id);
-                if (chat.username) {
-                  kinoUrl = `https://t.me/${chat.username}`;
-                } else {
-                  kinoUrl = `https://t.me/c/${Math.abs(kino_id)
-                    .toString()
-                    .slice(4)}`;
-                }
-              } catch (error) {
-                console.error(
-                  "Kino kanal ma'lumotlarini olishda xatolik:",
-                  error
-                );
-                kinoUrl = "";
-              }
-            }
-
-            const startTextBase64 = await RedisDB.getText("start");
-            const startText = startTextBase64
-              ? Buffer.from(startTextBase64, "base64").toString()
-              : "👋 Assalomu alaykum {name}  botimizga xush kelibsiz.\n\n✅🎭 Kino kodini yuboring.";
-            const currentTime = moment().format("DD.MM.YYYY | HH:mm");
-            const name = query.from.first_name;
-            const message = startText
-              .replace("{name}", `<a href="tg://user?id=${userId}">${name}</a>`)
-              .replace("{time}", currentTime);
-
-            const keyboard = {
-              inline_keyboard: [
-                [
-                  {
-                    text: "🔎 Kodlarni qidirish",
-                    url: kinoUrl || `https://t.me/durov`,
-                  },
-                ],
-                [
-                  {
-                    text: "🎲 Tasodifiy kino",
-                    callback_data: "random_movie",
-                  },
-                ],
-              ],
-            };
-
-            await bot.sendMessage(chatId, message, {
-              parse_mode: "HTML",
-              reply_markup: keyboard,
-            });
-            await RedisDB.updateUser(userId, { lastmsg: "start", step: "0" });
-          }
-        }
-
-        // Tasodifiy kino callback
-        if (data === "random_movie") {
-          try {
-            const movieCount = await RedisDB.getMovieCount();
-            if (movieCount === 0) {
-              await bot.answerCallbackQuery(query.id, {
-                text: "Kinolar mavjud emas!",
-              });
-              return;
-            }
-
-            const randomId = Math.floor(Math.random() * movieCount) + 1;
-            const movie = await RedisDB.getMovie(randomId.toString());
-
-            if (movie) {
-              const filmName = Buffer.from(
-                movie.film_name,
-                "base64"
-              ).toString();
-              const reklama = await RedisDB.getAdsText();
-              const bot_username = (await bot.getMe()).username;
-              const kino_id = await RedisDB.getMovieChannel();
-              let kino = "";
-              let kinoUrl = "";
-
-              if (kino_id) {
-                try {
-                  const chat = await bot.getChat(kino_id);
-                  if (chat.username) {
-                    kino = chat.username;
-                    kinoUrl = `https://t.me/${kino}`;
-                  } else {
-                    kino = chat.title || "Kino Kanali";
-                    kinoUrl = `https://t.me/c/${Math.abs(kino_id)
-                      .toString()
-                      .slice(4)}`;
-                  }
-                } catch (error) {
-                  console.error(
-                    "Kino kanal ma'lumotlarini olishda xatolik:",
-                    error
-                  );
-                  kino = "";
-                  kinoUrl = "";
-                }
-              }
-
-              const reklamaText = reklama
-                .replace("%kino%", kino)
-                .replace("%admin%", adminUsername);
-
-              const keyboard = {
-                inline_keyboard: [
-                  [
-                    {
-                      text: "↗️ Do'stlarga ulashish",
-                      url: `https://t.me/share/url/?url=https://t.me/${bot_username}?start=${randomId}`,
-                    },
-                  ],
-                  [
-                    {
-                      text: "🔎 Boshqa kodlar",
-                      url: kinoUrl || `https://t.me/durov`,
-                    },
-                  ],
-                  [
-                    {
-                      text: "🎲 Yana tasodifiy",
-                      callback_data: "random_movie",
-                    },
-                  ],
-                ],
-              };
-
-              await bot.editMessageMedia(
-                {
-                  type: "video",
-                  media: movie.file_id,
-                  caption: `<b>🎲 Tasodifiy film: ${filmName}</b>\n<b>🆔 Kod: ${randomId}</b>\n\n${reklamaText}`,
-                  parse_mode: "HTML",
-                },
-                {
-                  chat_id: chatId,
-                  message_id: messageId,
-                  reply_markup: keyboard,
-                }
-              );
-
-              await bot.answerCallbackQuery(query.id, {
-                text: `🎲 Yangi tasodifiy film: ${filmName}`,
-              });
-            } else {
-              await bot.answerCallbackQuery(query.id, {
-                text: "Tasodifiy kino topilmadi!",
-              });
-            }
-          } catch (error) {
-            console.error("Tasodifiy kino callback xatolik:", error);
-            await bot.answerCallbackQuery(query.id, {
-              text: "Xatolik yuz berdi!",
-            });
-          }
-        }
-
-      } catch (error) {
-        console.error("Callback query ishlov berish xatolik:", error);
-        await bot
-          .answerCallbackQuery(query.id, { text: "Xatolik yuz berdi!" })
-          .catch(() => {});
-      }
-    });
-
-    // Xabar ishlovchisi
-    bot.on("message", async (msg) => {
-      if (msg.text && msg.text.startsWith("/")) return;
-
-      const chatId = msg.chat.id;
-      const userId = msg.from.id;
-      const text = msg.text;
-
-      console.log(`Message received from user ${userId}: ${text}`);
-
-      if (msg.chat.type !== "private") return;
-
-      const user = await RedisDB.getUser(userId);
-      if (user && user.ban === "1") return;
-
-      if (!user) {
-        await RedisDB.createUser(userId);
-      }
-
-      const admins = await RedisDB.getAdmins();
-      const isAdmin = admins.includes(userId);
-
-      // Kino kodi qidirish
-      if (user && user.lastmsg === "start" && text && !text.startsWith("/")) {
-        let searchCode = text;
-        if (text.startsWith("/start ")) {
-          searchCode = text.split(" ")[1];
-        }
-
-        if (text === "/rand") {
-          const movieCount = await RedisDB.getMovieCount();
-          if (movieCount > 0) {
-            searchCode = Math.floor(Math.random() * movieCount) + 1;
-          }
-        }
-
-        if (!(await joinchat(userId))) return;
-
-        if (!isNaN(searchCode)) {
-          try {
-            const movie = await RedisDB.getMovie(searchCode);
-            if (movie) {
-              const filmName = Buffer.from(
-                movie.film_name,
-                "base64"
-              ).toString();
-              const reklama = await RedisDB.getAdsText();
-              const bot_username = (await bot.getMe()).username;
-              const kino_id = await RedisDB.getMovieChannel();
-              let kino = "";
-              let kinoUrl = "";
-
-              if (kino_id) {
-                try {
-                  const chat = await bot.getChat(kino_id);
-                  if (chat.username) {
-                    kino = chat.username;
-                    kinoUrl = `https://t.me/${kino}`;
-                  } else {
-                    kino = chat.title || "Kino Kanali";
-                    kinoUrl = `https://t.me/c/${Math.abs(kino_id)
-                      .toString()
-                      .slice(4)}`;
-                  }
-                } catch (error) {
-                  console.error(
-                    "Kino kanal ma'lumotlarini olishda xatolik:",
-                    error
-                  );
-                  kino = "";
-                  kinoUrl = "";
-                }
-              }
-
-              const reklamaText = reklama
-                .replace("%kino%", kino)
-                .replace("%admin%", adminUsername);
-
-              const keyboard = {
-                inline_keyboard: [
-                  [
-                    {
-                      text: "↗️ Do'stlarga ulashish",
-                      url: `https://t.me/share/url/?url=https://t.me/${bot_username}?start=${searchCode}`,
-                    },
-                  ],
-                  [
-                    {
-                      text: "🔎 Boshqa kodlar",
-                      url: kinoUrl || `https://t.me/durov`,
-                    },
-                  ],
-                ],
-              };
-
-              await bot.sendVideo(chatId, movie.file_id, {
-                caption: `<b>${filmName}</b>\n\n${reklamaText}`,
-                parse_mode: "HTML",
-                reply_markup: keyboard,
-              });
-
-              console.log(`Movie sent to user ${userId}: ${searchCode}`);
-            } else {
-              await bot.sendMessage(
-                chatId,
-                `📛 ${searchCode} <b>kodli kino mavjud emas!</b>`,
-                {
-                  parse_mode: "HTML",
-                }
-              );
-            }
-          } catch (error) {
-            console.error("Kino qidirishda xatolik:", error);
-            await bot.sendMessage(
-              chatId,
-              "⚠️ Kino qidirishda xatolik yuz berdi!"
-            );
-          }
-        } 
-        else {
-          await bot.sendMessage(
-            chatId,
-            "<b>📛 Faqat raqamlardan foydalaning!</b>",
-            {
-              parse_mode: "HTML",
-            }
-          );
-        }
-        return;
-      }
-
-      // Admin komandalarini ishlov berish
-      if (isAdmin) {
-        await handleAdminCommands(msg, user);
-      }
-    });
-
-    // Chat join request ishlovchisi
-    bot.on("chat_join_request", async (request) => {
-      const chatId = request.chat.id;
-      const userId = request.from.id;
-
-      try {
-        await RedisDB.addChannelRequest(chatId, userId);
-        console.log(`Join request added: ${userId} -> ${chatId}`);
-      } catch (error) {
-        console.error("Chat join request ishlov berish xatolik:", error);
-      }
-    });
-
-    // Chat member update ishlovchisi
-    bot.on("chat_member", async (update) => {
-      try {
-        if (
-          update.new_chat_member &&
-          update.new_chat_member.status === "kicked"
-        ) {
-          await RedisDB.updateUser(update.from.id, { sana: "tark" });
-        }
-      } catch (error) {
-        console.error("Chat member update ishlov berish xatolik:", error);
-      }
-    });
-    console.log("Bot handlers setup completed");
-  } 
-
-
-// Admin komandalarini ishlov berish
-async function handleAdminCommands(msg, user) {
-  const chatId = msg.chat.id;
-  const userId = msg.from.id;
-  const text = msg.text;
-  const step = user ? user.step : "0";
-
-  try {
-    switch (text) {
-      case "◀️ Orqaga":
-        await bot.sendMessage(
-          chatId,
-          "<b>👨🏻‍💻 Boshqaruv paneliga xush kelibsiz.</b>\n\n<i>Nimani o'zgartiramiz?</i>",
-          {
-            parse_mode: "HTML",
-            reply_markup: panel,
-          }
-        );
-        await RedisDB.updateUser(userId, { lastmsg: "panel", step: "0" });
-        break;
-
-      case "⬇️ Panelni Yopish":
-        await bot.sendMessage(
-          chatId,
-          "<b>🚪 Panelni tark etdingiz unga /panel yoki /admin xabarini yuborib kirishingiz mumkin.\n\nYangilash /start</b>",
-          {
-            parse_mode: "HTML",
-            reply_markup: removeKey,
-          }
-        );
-        await RedisDB.updateUser(userId, { lastmsg: "start", step: "0" });
-        break;
-
-      case "📊 Statistika":
-        await handleStatistics(chatId);
-        break;
-
-      case "🎬 Kino qo'shish":
-        await bot.sendMessage(chatId, "<b>🎬 Kinoni yuboring:</b>", {
-          parse_mode: "HTML",
-          reply_markup: cancel,
-        });
-        await RedisDB.updateUser(userId, { step: "movie" });
-        break;
-
-      default:
-        // Step-based ishlov berish
-        await handleStepBasedCommands(msg, user);
-    }
-  } catch (error) {
-    console.error("Admin komandalarini ishlov berish xatolik:", error);
-  }
-}
-
-// Statistika
-async function handleStatistics(chatId) {
-  try {
-    const allUsers = await RedisDB.getAllUsers();
-    const totalUsers = allUsers.length;
-    const leftUsers = allUsers.filter((user) => user.sana === "tark").length;
-    const activeUsers = totalUsers - leftUsers;
-    const movieCount = await RedisDB.getMovieCount();
-    const totalMoviesAdded = (await RedisDB.getSetting("kino")) || "0";
-    const deletedMovies = (await RedisDB.getSetting("kino2")) || "0";
-
-    const statsMessage = `💡 <b>Bot statistikasi:</b>
-
-• <b>Jami a'zolar:</b> ${totalUsers} ta
-• <b>Tark etgan a'zolar:</b> ${leftUsers} ta
-• <b>Faol a'zolar:</b> ${activeUsers} ta
-—————————————
-• <b>Faol kinolar:</b> ${movieCount} ta
-• <b>O'chirilgan kinolar:</b> ${deletedMovies} ta
-• <b>Barcha kinolar:</b> ${totalMoviesAdded} ta`;
-
-    await bot.sendMessage(chatId, statsMessage, { parse_mode: "HTML" });
-  } catch (error) {
-    console.error("Statistika olishda xatolik:", error);
-    await bot.sendMessage(chatId, "⚠️ Statistika olishda xatolik yuz berdi!");
-  }
-}
-
-// Step-based komandalarni ishlov berish
-async function handleStepBasedCommands(msg, user) {
-  const chatId = msg.chat.id;
-  const userId = msg.from.id;
-  const text = msg.text;
-  const step = user ? user.step : "0";
-
-  try {
-    // Video yuklash
-    if (step === "movie" && msg.video) {
-      const tempId = uuidv4();
-
-      // Redis'da temp ma'lumot saqlash
-      await redisClient.hSet(`film:${tempId}`, {
-        file_id: msg.video.file_id,
-        file_name: Buffer.from(msg.video.file_name || "video").toString(
-          "base64"
-        ),
-      });
-
-      await bot.sendMessage(chatId, "<b>🎬 Kino ma'lumotini yuboring:</b>", {
-        parse_mode: "HTML",
-        reply_markup: cancel,
-      });
-      await RedisDB.updateUser(userId, { step: "caption", temp_id: tempId });
-    }
-
-    // Caption qo'shish
-    if (step === "caption" && text && text !== "🎬 Kino qo'shish") {
-      const tempId = user.temp_id;
-
-      // Caption ni redisga yozamiz
-      await redisClient.hSet(`film:${tempId}`, {
-        caption: Buffer.from(text).toString("base64"),
-      });
-
-      // Redisdan ma'lumotlarni o'qib olamiz
-      const filmData = await redisClient.hGetAll(`film:${tempId}`);
-      const fileId = filmData.file_id;
-      const reklama = await RedisDB.getAdsText();
-
-      const keyboard = {
-        inline_keyboard: [
-          [
-            {
-              text: "🎞️ Kanalga yuborish",
-              callback_data: `channel_${tempId}`,
-            },
-          ],
-        ],
-      };
-
-      await bot.sendVideo(chatId, fileId, {
-        caption: `<b>${text}</b>\n\n<b>${reklama}</b>`,
-        parse_mode: "HTML",
-        reply_markup: keyboard,
-      });
-      await RedisDB.updateUser(userId, { step: "0" });
-    }
-  } catch (error) {
-    console.error("Step-based komandalar xatolik:", error);
-  }
-}
-
-// Helper function to format movie data as text
-function formatMovieText(movieData) {
-  if (!movieData) return "❌ Kino ma'lumotlari topilmadi.";
-
-  try {
-    let text = "";
-
-    if (movieData.name) {
-      text += `🎬 <b>${movieData.name}</b>\n`;
-    }
-
-    if (movieData.year) {
-      text += `📅 Yil: ${movieData.year}\n`;
-    }
-
-    if (movieData.genre) {
-      text += `🎭 Janr: ${movieData.genre}\n`;
-    }
-
-    if (movieData.rating) {
-      text += `⭐ Reyting: ${movieData.rating}\n`;
-    }
-
-    if (movieData.quality) {
-      text += `🔮 Sifat: ${movieData.quality}\n`;
-    }
-
-    if (movieData.language) {
-      text += `🗣 Til: ${movieData.language}\n`;
-    }
-
-    if (movieData.subtitle) {
-      text += `📝 Subtitle: ${movieData.subtitle}\n`;
-    }
-
-    if (movieData.description) {
-      text += `\n📖 Tavsif: ${movieData.description}\n`;
-    }
-
-    if (movieData.id) {
-      text += `\n🆔 Kod: ${movieData.id}`;
-    }
-
-    return text || "❌ Kino ma'lumotlari to'liq emas.";
-  } catch (error) {
-    console.error("Movie formatting error:", error);
-    return "❌ Kino ma'lumotlarini formatlashda xatolik.";
-  }
-}
-
 // Main handler function
 export default async function handler(req, res) {
   console.log(`Request received: ${req.method} ${req.url}`);
-
+  
   try {
     // Initialize Redis connection
     await initRedis();
@@ -1992,7 +1905,7 @@ export default async function handler(req, res) {
       // Handle webhook
       const update = req.body;
       console.log("Webhook update received:", JSON.stringify(update, null, 2));
-
+      
       try {
         // Use direct handler instead of bot.processUpdate
         await handleWebhookUpdate(update);
@@ -2001,7 +1914,7 @@ export default async function handler(req, res) {
         console.error("Update processing error:", processError);
         // Xatolikka qaramay 200 qaytarish
       }
-
+      
       res.status(200).json({ ok: true, timestamp: new Date().toISOString() });
     } else if (req.method === "GET") {
       // Health check
@@ -2010,9 +1923,9 @@ export default async function handler(req, res) {
         timestamp: new Date().toISOString(),
         redis_connected: isRedisConnected,
         bot_token_exists: !!API_KEY,
-        webhook_url: WEBHOOK_URL,
+        webhook_url: WEBHOOK_URL
       };
-
+      
       console.log("Health check:", status);
       res.status(200).json(status);
     } else {
@@ -2021,10 +1934,10 @@ export default async function handler(req, res) {
   } catch (error) {
     console.error("Handler global error:", error);
     // Xatolikka qaramay ham 200 qaytarish (Telegram webhook uchun)
-    res.status(200).json({
-      ok: false,
+    res.status(200).json({ 
+      ok: false, 
       error: error.message,
-      timestamp: new Date().toISOString(),
+      timestamp: new Date().toISOString()
     });
   }
 }
