@@ -1180,7 +1180,7 @@ const cancel = createKeyboard([[{ text: "◀️ Orqaga" }]]);
 const removeKey = { remove_keyboard: true };
 
 // Admin komandalarini ishlov berish
-async function handleAdminCommands(msg, user) {
+async function setupAdminHandlers(msg, user) {
 
     // /start komandasi
     bot.onText(/\/start/, async (msg) => {
@@ -1394,7 +1394,8 @@ async function handleAdminCommands(msg, user) {
                 },
               ],
               [{ text: "🎲 Yana tasodifiy", callback_data: "random_movie" }],
-            },
+            ],
+          
           };
 
           await bot.sendVideo(chatId, movie.file_id, {
@@ -1575,7 +1576,7 @@ async function handleAdminCommands(msg, user) {
                       callback_data: "random_movie",
                     },
                   ],
-                },
+                ],
               };
 
               await bot.editMessageMedia(
@@ -1608,7 +1609,6 @@ async function handleAdminCommands(msg, user) {
           }
         }
 
-        await bot.answerCallbackQuery(query.id);
       } catch (error) {
         console.error("Callback query ishlov berish xatolik:", error);
         await bot
@@ -1735,7 +1735,8 @@ async function handleAdminCommands(msg, user) {
               "⚠️ Kino qidirishda xatolik yuz berdi!"
             );
           }
-        } else {
+        } 
+        else {
           await bot.sendMessage(
             chatId,
             "<b>📛 Faqat raqamlardan foydalaning!</b>",
@@ -1779,12 +1780,9 @@ async function handleAdminCommands(msg, user) {
         console.error("Chat member update ishlov berish xatolik:", error);
       }
     });
-
     console.log("Bot handlers setup completed");
-  } catch (error) {
-    console.error("Bot handlers setup xatolik:", error);
-  }
-}
+  } 
+
 
 // Admin komandalarini ishlov berish
 async function handleAdminCommands(msg, user) {
