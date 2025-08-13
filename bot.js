@@ -1270,7 +1270,9 @@ bot.on("callback_query", async (query) => {
       await RedisDB.updateUser(userId, { step: "start-text" });
     }
 
-    { text: " Majburiy kanallar ro'yxati" }
+    {
+      text: " Majburiy kanallar ro'yxati";
+    }
     if (data === "list_mandatory_channels") {
       await handleMandatoryChannels(chatId, messageId, true);
     }
@@ -1959,27 +1961,27 @@ async function handleAdminCommands(msg, user) {
       );
       break;
 
-  try {
-    await fs.remove("admin/kino.txt");
-    await bot.sendMessage(
-      chatId,
-      "<b>✅ Kino saqlash kanali muvaffaqiyatli o'chirildi!</b>",
-      {
-        parse_mode: "HTML",
-        reply_markup: cancel,
+      try {
+        await fs.remove("admin/kino.txt");
+        await bot.sendMessage(
+          chatId,
+          "<b>✅ Kino saqlash kanali muvaffaqiyatli o'chirildi!</b>",
+          {
+            parse_mode: "HTML",
+            reply_markup: cancel,
+          }
+        );
+      } catch (error) {
+        await bot.sendMessage(
+          chatId,
+          "<b>❌ Kino saqlash kanalini o'chirishda xatolik yuz berdi!</b>",
+          {
+            parse_mode: "HTML",
+            reply_markup: cancel,
+          }
+        );
       }
-    );
-  } catch (error) {
-    await bot.sendMessage(
-      chatId,
-      "<b>❌ Kino saqlash kanalini o'chirishda xatolik yuz berdi!</b>",
-      {
-        parse_mode: "HTML",
-        reply_markup: cancel,
-      }
-    );
-  }
-  break;
+      break;
 
     case "🔎 Kino kodlari kanali":
       await bot.sendMessage(
@@ -2055,7 +2057,7 @@ async function handleAdminCommands(msg, user) {
       await RedisDB.updateUser(userId, { step: "start-text" });
       break;
 
-    case " Majburiy kanallar ro'yxati":
+    case "🟩 Majburiy kanallar ro'yxati":
       await handleMandatoryChannels(chatId);
       break;
 
@@ -2178,7 +2180,7 @@ async function handleMandatoryChannels(
   try {
     const channels = await RedisDB.getMandatoryChannels();
     if (channels.length === 0) {
-    { text: " Majburiy kanallar ro'yxati" }
+      const message = "<b>📋 Majburiy kanallar ro'yxati bo'sh!</b>";
       const markup = isCallback
         ? {
             inline_keyboard: [
@@ -2203,7 +2205,7 @@ async function handleMandatoryChannels(
       return;
     }
 
-    let message = "<b> Majburiy kanallar ro'yxati:</b>\n\n";
+    let message = "<b>🟩 Majburiy kanallar ro'yxati:</b>\n\n";
     for (const channelId of channels) {
       try {
         const chat = await bot.getChat(channelId);
@@ -2597,6 +2599,9 @@ async function handleStepBasedCommands(msg, user) {
         );
         return;
       }
+
+      // Kanalni aslida o'chirish
+      await RedisDB.removeChannel(channelId);
 
       await bot.sendMessage(
         chatId,
@@ -3288,5 +3293,3 @@ process.on("SIGINT", async () => {
 startServer().catch(console.error);
 
 module.exports = { bot, redisClient, RedisDB };
-
-
